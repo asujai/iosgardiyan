@@ -13,7 +13,8 @@ targets:
       - path: BoundaryShield/Sources/Resources
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.asujai.boundaryshield
-      DEVELOPMENT_TEAM: "" # Xcode üzerinde kullanıcı kendi takımını seçebilir
+      DEVELOPMENT_TEAM: "" 
+      GENERATE_INFOPLIST_FILE: YES
     entitlements:
       path: BoundaryShield/Sources/Resources/BoundaryShield.entitlements
     dependencies:

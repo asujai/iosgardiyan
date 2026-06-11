@@ -24,12 +24,17 @@ public final class ScreenTimeAuthorizationManager: ObservableObject {
         // Yetki durum değişikliklerini dinle
         NotificationCenter.default.publisher(for: NSNotification.Name("AuthorizationCenterDidChange"))
             .sink { [weak self] _ in
-                guard let self = self else { return }
-                DispatchQueue.main.async {
-                    self.authorizationStatus = self.center.authorizationStatus
-                }
+                self?.refreshAuthorizationStatus()
             }
             .store(in: &cancellables)
+    }
+    
+    /// Yetki durumunu doğrudan Aile Denetimleri merkezinden okuyarak günceller.
+    public func refreshAuthorizationStatus() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.authorizationStatus = self.center.authorizationStatus
+        }
     }
     
     /// Aile denetimleri (Screen Time) izni talep eder (Swift Concurrency).
@@ -37,7 +42,7 @@ public final class ScreenTimeAuthorizationManager: ObservableObject {
     public func requestAuthorization() async throws {
         do {
             try await center.requestAuthorization(for: .individual)
-            authorizationStatus = center.authorizationStatus
+            refreshAuthorizationStatus()
             LocalDataStore.shared.addLog(
                 title: "İzin Talebi",
                 detail: "Screen Time izni talep edildi. Durum: \(String(describing: authorizationStatus))",

@@ -21,7 +21,7 @@ public final class SafeDailyResetManager {
         var lastKnownTimeZoneIdentifier: String = TimeZone.current.identifier
     }
     
-    private let metadataKey = "boundaryshield_reset_metadata_v2"
+    private let metadataKey = "boundaryshield_reset_metadata_v3"
     
     private init() {
         self.defaults = UserDefaults(suiteName: AppConfiguration.appGroupId) ?? UserDefaults.standard
@@ -66,9 +66,14 @@ public final class SafeDailyResetManager {
         metadata.lastKnownWallClockTime = currentWallClock
         saveMetadata(metadata)
         
-        // İlk kurulum doğrulaması
+        // İlk kurulum doğrulaması (Sadece metadata kaydet, log/başarı yazma)
         if metadata.lastResetDate == Date.distantPast {
-            performResetActions(&metadata, now: now, currentWallClock: currentWallClock, currentUptime: currentUptime, currentTimeZone: currentTimeZone)
+            metadata.lastResetDate = now
+            metadata.lastResetWallClockTime = currentWallClock
+            metadata.lastResetSystemUptime = currentUptime
+            metadata.lastKnownWallClockTime = currentWallClock
+            metadata.lastKnownTimeZoneIdentifier = currentTimeZone.identifier
+            saveMetadata(metadata)
             return true
         }
         
@@ -105,28 +110,40 @@ public final class SafeDailyResetManager {
     }
     
     private func performResetActions(_ metadata: inout ResetMetadata, now: Date, currentWallClock: TimeInterval, currentUptime: TimeInterval, currentTimeZone: TimeZone) {
-        LocalDataStore.shared.addLog(
-            title: "Güvenli Günlük Reset",
-            detail: "Yeni gün kural ve limit güncellemeleri başarıyla uygulandı.",
-            type: .success
-        )
+        let evaluatedDate = metadata.lastResetDate
+        let calendar = Calendar.current
+        let evaluatedWeekday = calendar.component(.weekday, from: evaluatedDate)
         
         var rules = LocalDataStore.shared.loadRules()
-        var wasAnyRuleMonitoredToday = false
+        var wasAnyRuleMonitoredYesterday = false
+        var wasAnyRuleFailedYesterday = false
         
-        let calendar = Calendar.current
-        let todayWeekday = calendar.component(.weekday, from: now)
-        
-        for i in 0..<rules.count {
-            if rules[i].isActive && rules[i].activeWeekdays.contains(todayWeekday) {
-                wasAnyRuleMonitoredToday = true
+        // 1. Önceki günün durumunu değerlendir (Bypass koruması için reset öncesi kontrol)
+        for rule in rules {
+            if rule.isActive && rule.activeWeekdays.contains(evaluatedWeekday) {
+                wasAnyRuleMonitoredYesterday = true
+                if rule.isFailed {
+                    wasAnyRuleFailedYesterday = true
+                }
             }
-            
-            // Limit durumunu sıfırla
+        }
+        
+        // 2. Disiplin değerlendirmesini önceki günün tarihiyle yaz
+        if wasAnyRuleMonitoredYesterday {
+            if wasAnyRuleFailedYesterday {
+                // Eğer dün en az 1 kısıtlama kuralı aşıldıysa bu bir ihlaldir
+                DisciplineEngine.shared.recordViolation(for: evaluatedDate)
+            } else {
+                // Hiçbir kural ihlal edilmeden gün tamamlandıysa başarı yaz
+                DisciplineEngine.shared.recordSuccess(for: evaluatedDate)
+            }
+        }
+        
+        // 3. Günlük state'leri sıfırla ve planlanan yarın güncellemelerini uygula
+        for i in 0..<rules.count {
             rules[i].isFailed = false
             rules[i].currentDayState = "monitoring"
             
-            // Planlanan yeni kural sürelerini uygula
             if let pendingLimit = rules[i].plannedNextDayLimit {
                 rules[i].dailyLimit = pendingLimit
                 rules[i].plannedNextDayLimit = nil
@@ -138,7 +155,6 @@ public final class SafeDailyResetManager {
                 )
             }
             
-            // Planlanan yeni aktif günleri uygula
             if let pendingDays = rules[i].plannedNextDayActiveDays {
                 rules[i].activeWeekdays = pendingDays
                 rules[i].plannedNextDayActiveDays = nil
@@ -153,12 +169,13 @@ public final class SafeDailyResetManager {
         
         LocalDataStore.shared.saveRules(rules)
         
-        // Disiplin başarı değerlendirmesi
-        if wasAnyRuleMonitoredToday {
-            DisciplineEngine.shared.recordSuccess(for: now)
-        }
+        LocalDataStore.shared.addLog(
+            title: "Güvenli Günlük Reset",
+            detail: "Yeni gün sıfırlamaları başarıyla uygulandı.",
+            type: .success
+        )
         
-        // İzleme planlarını yeniden oluştur
+        // İzleme planlarını yenile
         ScreenTimeProtectionEngine.shared.refreshMonitoring()
         
         // Metadata güncelleme
@@ -169,5 +186,11 @@ public final class SafeDailyResetManager {
         metadata.lastKnownTimeZoneIdentifier = currentTimeZone.identifier
         
         saveMetadata(metadata)
+    }
+    
+    /// Reset metadata verilerini tamamen temizler (İlk kurulum haline döner).
+    public func clearMetadata() {
+        defaults.removeObject(forKey: metadataKey)
+        defaults.synchronize()
     }
 }

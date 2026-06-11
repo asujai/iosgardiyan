@@ -17,6 +17,7 @@ struct RuleManagementSheet: View {
     @State private var limitHour: Int = 0
     @State private var limitMinute: Int = 0
     @State private var selectedDays: Set<Int> = []
+    @State private var errorMessage: String? = nil
     
     // Silme Butonu İçin Basılı Tutma State'leri
     @State private var isPressing = false
@@ -46,6 +47,13 @@ struct RuleManagementSheet: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         infoAlert
+                        
+                        if let error = errorMessage {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(UITheme.errorRed)
+                                .padding(.horizontal)
+                        }
                         
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Sınır Adı")
@@ -87,6 +95,8 @@ struct RuleManagementSheet: View {
                             .padding()
                             .background(UITheme.cardDark)
                             .cornerRadius(12)
+                            .onChange(of: limitHour) { _ in validateTime() }
+                            .onChange(of: limitMinute) { _ in validateTime() }
                         }
                         .padding(.horizontal)
                         
@@ -126,10 +136,11 @@ struct RuleManagementSheet: View {
                                 .font(.system(size: 16, weight: .bold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .background(UITheme.copperAccent)
-                                .foregroundColor(.black)
+                                .background(isSaveDisabled ? Color.gray.opacity(0.3) : UITheme.copperAccent)
+                                .foregroundColor(isSaveDisabled ? UITheme.textSecondary : .black)
                                 .cornerRadius(12)
                         }
+                        .disabled(isSaveDisabled)
                         .padding(.horizontal)
                         .padding(.top, 10)
                         
@@ -226,6 +237,22 @@ struct RuleManagementSheet: View {
         }
     }
     
+    // MARK: - Validation
+    
+    private var isSaveDisabled: Bool {
+        let isTimeZero = limitHour == 0 && limitMinute == 0
+        let isNameEmpty = ruleName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return isTimeZero || isNameEmpty || selectedDays.isEmpty
+    }
+    
+    private func validateTime() {
+        if limitHour == 0 && limitMinute == 0 {
+            errorMessage = "Süre limiti 0 olamaz. En az 1 dakika seçmelisiniz."
+        } else {
+            errorMessage = nil
+        }
+    }
+    
     // MARK: - Core Operations
     
     private func saveChanges() {
@@ -234,23 +261,36 @@ struct RuleManagementSheet: View {
         
         let newSeconds = TimeInterval((limitHour * 3600) + (limitMinute * 60))
         
-        // 1. Süre Artış Kontrolü (Aynı gün artış engellenir, yarına planlanır)
+        // 0 dakika kontrolü
+        if newSeconds == 0 {
+            errorMessage = "Geçersiz süre."
+            return
+        }
+        
+        // 1. Süre Artış Kontrolü (Yarına planlanır)
         if newSeconds > rule.dailyLimit {
             rules[index].plannedNextDayLimit = newSeconds
             LocalDataStore.shared.addLog(
                 title: "Limit Artışı Planlandı",
-                detail: "'\(rule.name)' limit artış talebi bypass koruması nedeniyle yarına planlandı.",
+                detail: "'\(rule.name)' limit artış talebi yarına planlandı.",
                 type: .info
             )
         } else if newSeconds < rule.dailyLimit {
-            // Süre azaltımı hemen uygulanabilir
+            // Süre azaltımı hemen uygulanır (Güvenli monitoring yenilemesi)
+            // Önce durdur
+            ScreenTimeProtectionEngine.shared.stopMonitoring(rule: rules[index])
+            
+            // Güncelle ve kaydet
             rules[index].dailyLimit = newSeconds
             rules[index].plannedNextDayLimit = nil
-            // İzlemeyi güncelle
+            LocalDataStore.shared.saveRules(rules)
+            
+            // Yeniden başlat
             ScreenTimeProtectionEngine.shared.startMonitoring(rule: rules[index])
+            
             LocalDataStore.shared.addLog(
                 title: "Limit Azaltıldı",
-                detail: "'\(rule.name)' kural limiti hemen uygulandı.",
+                detail: "'\(rule.name)' kural limiti güvenli şekilde yenilenerek hemen uygulandı.",
                 type: .success
             )
         }
@@ -272,15 +312,13 @@ struct RuleManagementSheet: View {
         dismiss()
     }
     
-    // MARK: - Delete Timer Management
-    
     private func startDeleteTimer() {
         isPressing = true
         deleteProgress = 0.0
         
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             if deleteProgress < 1.0 {
-                deleteProgress += 0.02 // 5 saniyede %100
+                deleteProgress += 0.02
             } else {
                 stopDeleteTimer()
                 performDelete()
@@ -303,12 +341,11 @@ struct RuleManagementSheet: View {
         rules.removeAll(where: { $0.id == rule.id })
         LocalDataStore.shared.saveRules(rules)
         
-        // Monitoring sonlandır ve shield kaldır
         ScreenTimeProtectionEngine.shared.stopMonitoring(rule: rule)
         
         LocalDataStore.shared.addLog(
             title: "Sınır Silindi",
-            detail: "'\(rule.name)' kısıtlama kuralı basılı tutularak silindi.",
+            detail: "'\(rule.name)' kısıtlama kuralı kaldırıldı.",
             type: .warning
         )
         

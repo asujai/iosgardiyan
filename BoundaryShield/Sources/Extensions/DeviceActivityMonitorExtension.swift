@@ -22,6 +22,9 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         var rules = LocalDataStore.shared.loadRules()
         guard let index = rules.firstIndex(where: { $0.id.uuidString == ruleIdString }) else { return }
         
+        // Aynı gün birden fazla kez ihlal kaydı oluşmasını engellemek için kontrol
+        if rules[index].isFailed { return }
+        
         // 2. Kural durumunu güncelle
         rules[index].isFailed = true
         rules[index].currentDayState = "shielded"
@@ -37,7 +40,10 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             type: .warning
         )
         
-        // 5. Kullanıcıya bildirim gönder
+        // 5. Disiplin ihlali olarak kaydet
+        DisciplineEngine.shared.recordViolation(for: Date())
+        
+        // 6. Kullanıcıya bildirim gönder
         NotificationManager.shared.sendLocalNotification(
             title: "Süre Sınırı Aşıldı",
             body: "'\(rules[index].name)' için belirlenen günlük süre sınırı doldu."
@@ -46,6 +52,20 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     
     public override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
+        
+        let ruleIdString = activity.rawValue
+        let rules = LocalDataStore.shared.loadRules()
+        
+        guard let rule = rules.first(where: { $0.id.uuidString == ruleIdString }) else { return }
+        
+        let calendar = Calendar.current
+        let todayWeekday = calendar.component(.weekday, from: Date())
+        
+        // Bugün rule aktif günlerinden biri değilse monitoring/shield uygulanmasın, gerekirse temizlensin
+        if !rule.activeWeekdays.contains(todayWeekday) {
+            ShieldStoreManager.shared.removeShield(for: rule)
+            print("INFO: BoundaryShield day not active. Shield removed for \(rule.name).")
+        }
     }
     
     public override func intervalDidEnd(for activity: DeviceActivityName) {
@@ -54,7 +74,6 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         let ruleIdString = activity.rawValue
         let rules = LocalDataStore.shared.loadRules()
         if let rule = rules.first(where: { $0.id.uuidString == ruleIdString }) {
-            // İzleme aralığı sona erdiğinde kısıtlamayı kaldır
             ShieldStoreManager.shared.removeShield(for: rule)
         }
     }

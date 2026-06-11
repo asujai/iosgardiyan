@@ -9,6 +9,7 @@ import SwiftUI
 
 @main
 struct BoundaryShieldApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var authManager = ScreenTimeAuthorizationManager.shared
     @State private var hasCheckedReset = false
     @AppStorage(AppConfiguration.Keys.theme) private var savedTheme: String = "system"
@@ -33,6 +34,14 @@ struct BoundaryShieldApp: App {
                 if !hasCheckedReset {
                     _ = SafeDailyResetManager.shared.checkAndPerformReset()
                     hasCheckedReset = true
+                }
+            }
+            .onChange(of: scenePhase) { newPhase in
+                if newPhase == .active {
+                    // Uygulama ön plana geldiğinde yetki durumunu güncelle
+                    authManager.refreshAuthorizationStatus()
+                    // reset durumunu kontrol et
+                    _ = SafeDailyResetManager.shared.checkAndPerformReset()
                 }
             }
         }

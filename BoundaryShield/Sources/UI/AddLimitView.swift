@@ -16,6 +16,7 @@ struct AddLimitView: View {
     @State private var limitHour: Int = 1
     @State private var limitMinute: Int = 0
     @State private var activeDays: Set<Int> = Set([2, 3, 4, 5, 6]) // Varsayılan: Hafta içi
+    @State private var errorMessage: String? = nil
     
     let weekdays = [
         (2, "Pzt"), (3, "Sal"), (4, "Çar"), (5, "Per"), (6, "Cum"), (7, "Cmt"), (1, "Paz")
@@ -28,6 +29,13 @@ struct AddLimitView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
+                        if let error = errorMessage {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(UITheme.errorRed)
+                                .padding(.horizontal)
+                        }
+                        
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Sınır Adı")
                                 .font(.caption)
@@ -94,6 +102,8 @@ struct AddLimitView: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
                             )
+                            .onChange(of: limitHour) { _ in validateTime() }
+                            .onChange(of: limitMinute) { _ in validateTime() }
                         }
                         .padding(.horizontal)
                         
@@ -158,7 +168,7 @@ struct AddLimitView: View {
         }
     }
     
-    // MARK: - Core Operations
+    // MARK: - Validation
     
     private var isSaveDisabled: Bool {
         let isSelectionEmpty = selection.applicationTokens.isEmpty &&
@@ -170,8 +180,23 @@ struct AddLimitView: View {
         return isSelectionEmpty || isTimeZero || isNameEmpty || activeDays.isEmpty
     }
     
+    private func validateTime() {
+        if limitHour == 0 && limitMinute == 0 {
+            errorMessage = "Limit süresi 0 olamaz. Lütfen en az 1 dakika seçin."
+        } else {
+            errorMessage = nil
+        }
+    }
+    
+    // MARK: - Core Operations
+    
     private func saveRule() {
         let totalSeconds = TimeInterval((limitHour * 3600) + (limitMinute * 60))
+        
+        if totalSeconds == 0 {
+            errorMessage = "Geçersiz süre."
+            return
+        }
         
         let newRule = AppLimitRule(
             name: ruleName,
@@ -187,12 +212,11 @@ struct AddLimitView: View {
         currentRules.append(newRule)
         LocalDataStore.shared.saveRules(currentRules)
         
-        // Monitoring başlat
         ScreenTimeProtectionEngine.shared.startMonitoring(rule: newRule)
         
         LocalDataStore.shared.addLog(
             title: "Sınır Oluşturuldu",
-            detail: "'\(ruleName)' adlı kısıtlama kuralı oluşturuldu ve izlenmeye başlandı.",
+            detail: "'\(ruleName)' adlı kısıtlama kuralı oluşturuldu.",
             type: .success
         )
         

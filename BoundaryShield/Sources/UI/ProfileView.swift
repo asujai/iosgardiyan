@@ -319,7 +319,7 @@ struct ProfileView: View {
                         
                         privacyPoint(title: "1. İnternet Erişimi Yoktur", desc: "Uygulamamız hiçbir şekilde internet bağlantısı kurmaz. Bilgileriniz herhangi bir sunucuya veya üçüncü tarafa gönderilmez.")
                         
-                        privacyPoint(title: "2. Veriler Cihazınızda Kalır", desc: "Kısıtladığınız uygulamalar, disiplin seriniz ve günlük loglarınız, Apple'ın güvenli App Group UserDefaults sistemiyle şifrelenmiş olarak cihazınızda yerel olarak saklanır.")
+                        privacyPoint(title: "2. Veriler Cihazınızda Kalır", desc: "Kısıtladığınız uygulamalar, disiplin seriniz ve günlük loglarınız, App Group üzerinden cihazınızda yerel olarak saklanır. Sunucuya gönderilmez, üçüncü taraf SDK kullanılmaz. iOS'un sistem güvenliği ve uygulama sandbox yapısı içinde tutulur.")
                         
                         privacyPoint(title: "3. Apple Screen Time Entegrasyonu", desc: "Uygulama kısıtlamaları Apple'ın resmi FamilyControls ve ManagedSettings çerçeveleri üzerinden yürütülür. Bu çerçevelerin topladığı kişisel uygulama verilerine geliştirici dahil hiç kimse erişemez.")
                     }

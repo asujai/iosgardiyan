@@ -29,7 +29,6 @@ public final class LocalDataStore {
     // MARK: - Logs (StatusLog)
     
     public func saveLogs(_ logs: [StatusLog]) {
-        // Log şişmesini önlemek için son 500 logu saklayalım
         let trimmed = Array(logs.prefix(500))
         store.save(trimmed, forKey: AppConfiguration.Keys.logs)
     }
@@ -82,6 +81,9 @@ public final class LocalDataStore {
     // MARK: - Reset & Clear
     
     public func clearAllData() {
+        // Sıfırlama metadata'sını temizle
+        SafeDailyResetManager.shared.clearMetadata()
+        
         store.remove(forKey: AppConfiguration.Keys.rules)
         store.remove(forKey: AppConfiguration.Keys.disciplineState)
         store.remove(forKey: AppConfiguration.Keys.quotes)
@@ -90,6 +92,6 @@ public final class LocalDataStore {
         store.remove(forKey: AppConfiguration.Keys.language)
         store.remove(forKey: AppConfiguration.Keys.onlyMyQuotes)
         
-        addLog(title: "Sistem Sıfırlandı", detail: "Tüm yerel veriler kullanıcı tarafından temizlendi.", type: .warning)
+        addLog(title: "Sistem Sıfırlandı", detail: "Tüm yerel veriler ve reset ayarları temizlendi.", type: .warning)
     }
 }
