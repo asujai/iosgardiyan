@@ -32,6 +32,9 @@ targets:
       - path: BoundaryShield/Sources/Core/LocalDataStore.swift
       - path: BoundaryShield/Sources/Core/DataModels.swift
       - path: BoundaryShield/Sources/Core/QuoteManager.swift
+      - path: BoundaryShield/Sources/Core/DisciplineEngine.swift
+      - path: BoundaryShield/Sources/Core/ShieldStoreManager.swift
+      - path: BoundaryShield/Sources/Core/NotificationManager.swift
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.asujai.boundaryshield.deviceactivitymonitor
       INFOPLIST_FILE: BoundaryShield/Sources/Resources/DeviceActivityMonitor-Info.plist

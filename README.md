@@ -53,20 +53,16 @@ Windows üzerinde tamamen Mac/Xcode açmadan geliştirme döngüsü şu adımlar
 
 ---
 
-## 3. GitHub Actions Build Workflow
+## 3. GitHub Actions Build Sistemi
 
 Bulut tabanlı derleme sistemi `.github/workflows/ios-build.yml` dosyası altında tanımlanmıştır. 
 
-### Workflow Adımları:
-* **macOS Runner (Apple Silicon)**: En hızlı derleme süreleri için Apple Silicon tabanlı `macos-14` runner'ı kullanılır.
-* **Xcode Kurulumu**: Derleme için kararlı `Xcode 15.4` sürümü seçilir.
-* **XcodeGen Generate**: Proje kök dizinindeki `project.yml` okunarak `BoundaryShield.xcodeproj` ve ilişkili tüm Xcode target'ları, entitlements ve Info.plist dosyaları sıfırdan oluşturulur.
-* **Birim Testleri (xcodebuild test)**: `BoundaryShieldTests` şeması iOS Simülatöründe (`iPhone 15, OS 17.5`) çalıştırılır.
-* **Xcode Archive**: Uygulama Release (veya signing yoksa Debug) modunda derlenerek `.xcarchive` paketi üretilir.
-* **Export IPA**: 
-  * **İmzalı (Signing Konfigüre Edilmiş)**: Apple Developer sertifikaları ve provisioning profilleri kullanılarak cihazda çalışabilir gerçek bir IPA üretilir.
-  * **İmzasız (Generic/Simulator)**: Geliştirici sertifikaları girilmemişse, workflow hata vermeden imzasız `.app` dosyasını `Payload/` klasörüne alıp zip'leyerek test amaçlı bir imzasız IPA taklidi üretir.
-* **Upload Artifact**: Üretilen IPA dosyası, GitHub Actions arayüzünden indirilebilecek şekilde artifact olarak kaydedilir.
+### macOS Runner & Xcode Sürüm Notları:
+- **macOS Runner (Apple Silicon)**: En hızlı derleme süreleri için Apple Silicon tabanlı `macos-14` runner'ı kullanılır.
+- **Xcode Kurulumu**: Derleme için kararlı `Xcode 15.4` sürümü seçilir.
+- > [!NOTE]
+  > **Geleceğe Yatırım**: `macos-14` ve `Xcode_15.4.app` sürümü ilerleyen süreçte GitHub tarafından yayından kaldırılabilir. Böyle bir durumda workflow dosyasındaki runner sürümü `macos-15` veya `macos-latest` olarak güncellenmeli ve kullanılabilir Xcode yolu (`sudo xcode-select -s ...`) yeni sürüme göre güncellenmelidir. Workflow'da derleme öncesinde kullanılabilir tüm Xcode sürümleri `ls -la /Applications | grep Xcode` komutuyla loglanmaktadır.
+- **Birim Testleri (xcodebuild test)**: Testler simülatör hedefine (`iPhone 15, OS 17.5`) yönlendirilmiş olup, hata tespiti için `-quiet` parametresi kaldırılmıştır. Hata oluştuğunda tüm derleme çıktıları doğrudan logda okunabilir.
 
 ---
 
@@ -111,15 +107,22 @@ Eğer Apple Developer programına üyeyseniz ve uygulamanın Screen Time (Family
 | `APPLE_TEAM_ID` | Apple Developer hesabınıza ait 10 haneli Team ID. | Developer portalından (Membership Details) alınır. |
 | `IOS_CERTIFICATE_P12_BASE64` | Apple Development veya Distribution sertifikanızın (.p12) Base64 formatında kodlanmış hali. | Keychain Access'ten `.p12` olarak ihraç edin ve terminalde base64'e çevirin. |
 | `IOS_CERTIFICATE_PASSWORD` | `.p12` sertifika dosyasını ihraç ederken belirlediğiniz şifre. | Sertifikayı oluştururken girdiğiniz parola. |
-| `IOS_PROVISIONING_PROFILE_BASE64` | Uygulama ve tüm extension'lar için oluşturulmuş Provisioning Profile dosyasının (.mobileprovision) Base64 formatında kodlanmış hali. | Developer portalından indirdiğiniz `.mobileprovision` dosyasını terminalde base64'e çevirin. |
 | `KEYCHAIN_PASSWORD` | Bulut macos makinesinde geçici keychain oluşturmak için kullanılacak rastgele güçlü bir şifre. | Kendiniz belirleyebilirsiniz (Örn: `Sifre123!`). |
+| `IOS_APP_PROFILE_BASE64` | Ana uygulama (`com.asujai.boundaryshield`) için oluşturulmuş Provisioning Profile (.mobileprovision) Base64 kodu. | Developer portalından indirilip Base64'e çevrilir. |
+| `IOS_DEVICE_ACTIVITY_PROFILE_BASE64` | Device Activity uzantısı (`com.asujai.boundaryshield.deviceactivitymonitor`) için Provisioning Profile Base64 kodu. | Developer portalından indirilip Base64'e çevrilir. |
+| `IOS_SHIELD_CONFIGURATION_PROFILE_BASE64` | Shield Configuration uzantısı (`com.asujai.boundaryshield.shieldconfiguration`) için Provisioning Profile Base64 kodu. | Developer portalından indirilip Base64'e çevrilir. |
+| `IOS_SHIELD_ACTION_PROFILE_BASE64` | Shield Action uzantısı (`com.asujai.boundaryshield.shieldaction`) için Provisioning Profile Base64 kodu. | Developer portalından indirilip Base64'e çevrilir. |
 
 > [!TIP]
 > **Base64 Dönüştürme Komutu (Windows PowerShell)**:
 > ```powershell
-> [Convert]::ToBase64String([IO.File]::ReadAllBytes("sertifika.p12")) | Out-File -FilePath certificate_base64.txt
+> [Convert]::ToBase64String([IO.File]::ReadAllBytes("dosya_adi.mobileprovision")) | Out-File -FilePath profile_base64.txt
 > ```
 > Oluşan `.txt` dosyasındaki tek satırlık uzun metni kopyalayıp GitHub Secret alanına yapıştırın.
+
+> [!WARNING]
+> **ExportOptions.plist Profil Eşleşmesi**:
+> Kök dizindeki `ExportOptions.plist` içerisinde `provisioningProfiles` sözlüğündeki profil isimlerinin, Apple portalında oluşturduğunuz profillerin **tam adı** ile eşleşmesi gerekir. Kendi profil isimlerinizi buraya yazmayı unutmayın.
 
 ---
 
@@ -157,6 +160,7 @@ Windows üzerinden yükleme yaptıktan sonra gerçek cihazda şu adımlarla doğ
 
 ## 8. Bilinen Sınırlamalar (Limitations)
 
+* **İmzasız IPA Kısıtlamaları**: GitHub Actions üzerinde signing secrets olmadan üretilen imzasız `.ipa` dosyası (Payload zip'i), gerçek bir iPhone cihazında çalışmaz. Screen Time/Family Controls API'lerinin ve extension'larının aktif olabilmesi için uygulamanın Apple Developer hesabı ve provisioning profilleriyle imzalanması **zorunludur**.
 * **Yerel Simülatör Yok**: Windows makinede yerel olarak macOS işletim sistemi ve Xcode Simülatörü çalıştırılamaz. Tüm UI testleri veya derleme kontrolleri cloud macOS çıktısı IPA ile gerçek cihazda veya uzaktan yapılmalıdır.
 * **Screen Time API Simülatör Kısıtları**: Apple'ın Family Controls API'si iOS simülatöründe bazı durumlarda (özellikle shield gösterme ve arka plan monitorizasyonunda) stabil çalışmaz. Bu nedenle nihai testler mutlaka gerçek cihazda (iPhone) yapılmalıdır.
 * **7 Günlük Sideloading Limiti**: Bireysel Apple Developer hesabı yerine ücretsiz Apple ID ile Sideloadly kullanarak kurulan uygulamalar, Apple güvenlik politikaları gereği 7 gün sonra açılmaz hale gelir. Bu durumda uygulamayı bilgisayardan tekrar sideload etmek gerekir.

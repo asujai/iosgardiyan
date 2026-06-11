@@ -24,16 +24,21 @@ public final class AppGroupStore {
         let data: T
     }
     
-    private var containerURL: URL? {
-        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupId)
+    private var containerURL: URL {
+        if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupId) {
+            return url
+        }
+        // Fallback directory (unit testler veya imzasız simülatör debug ortamı için)
+        let fallbackUrl = FileManager.default.temporaryDirectory.appendingPathComponent("BoundaryShieldTestStore")
+        return fallbackUrl
     }
     
-    private func fileURL(for key: String) -> URL? {
-        return containerURL?.appendingPathComponent("\(key).json")
+    private func fileURL(for key: String) -> URL {
+        return containerURL.appendingPathComponent("\(key).json")
     }
     
     private func createContainerDirectoryIfNeeded() {
-        guard let url = containerURL else { return }
+        let url = containerURL
         if !FileManager.default.fileExists(atPath: url.path) {
             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
         }
@@ -46,11 +51,8 @@ public final class AppGroupStore {
         lock.lock()
         defer { lock.unlock() }
         
-        guard let url = fileURL(for: key) else {
-            print("ERROR: BoundaryShield AppGroup container URL not available.")
-            return
-        }
-        
+        createContainerDirectoryIfNeeded()
+        let url = fileURL(for: key)
         let envelope = StoreEnvelope(schemaVersion: currentSchemaVersion, data: object)
         
         do {
@@ -67,7 +69,8 @@ public final class AppGroupStore {
         lock.lock()
         defer { lock.unlock() }
         
-        guard let url = fileURL(for: key), FileManager.default.fileExists(atPath: url.path) else {
+        let url = fileURL(for: key)
+        guard FileManager.default.fileExists(atPath: url.path) else {
             return nil
         }
         
@@ -93,7 +96,7 @@ public final class AppGroupStore {
         lock.lock()
         defer { lock.unlock() }
         
-        guard let url = fileURL(for: key) else { return }
+        let url = fileURL(for: key)
         if FileManager.default.fileExists(atPath: url.path) {
             try? FileManager.default.removeItem(at: url)
         }
