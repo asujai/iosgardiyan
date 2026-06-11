@@ -1,0 +1,32 @@
+/* 
+  Localizable.strings (English)
+  BoundaryShield
+
+  Created by Antigravity on 2026-06-11.
+*/
+
+"app_name" = "Boundary Shield";
+"home_title" = "Today's Willpower";
+"stats_saved_time" = "Time Gained";
+"active_limits" = "Active Boundaries";
+"limits_reached" = "Limits Reached";
+"streak" = "Success Streak";
+"add_limit" = "Add New Boundary";
+"delete_limit" = "Hold 5 Seconds to Delete";
+"save_changes" = "Save Changes";
+"rule_name" = "Boundary Name";
+"daily_limit" = "Daily Limit Duration";
+"active_days" = "Active Days";
+"bypass_protection_active" = "Bypass Protection Active";
+"bypass_protection_desc" = "To prevent bypass, limit increases and active day reductions will take effect after tomorrow's midnight reset. Limit decreases and deletion can be applied immediately.";
+"discipline_journey" = "Discipline Journey";
+"discipline_desc" = "It takes 21 days to form a habit and 90 days to build character. This 100-day block is designed to solidify your willpower.";
+"clear_all_data" = "Clear All Data";
+"privacy_title" = "Data Usage and Privacy Policy";
+"privacy_desc" = "Boundary Shield is designed to work completely offline. Your privacy is our highest priority.";
+"onboarding_title" = "Boundary Shield";
+"onboarding_subtitle" = "Draw Your Digital Boundaries, Strengthen Your Will";
+"onboarding_btn" = "Start Setup and Grant Permission";
+"shield_title" = "Limit Reached for Today";
+"shield_subtitle" = "You set this boundary. Stop here for today.";
+"shield_button" = "Return to Main App";

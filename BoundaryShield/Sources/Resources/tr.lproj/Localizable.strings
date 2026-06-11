@@ -1,0 +1,32 @@
+/* 
+  Localizable.strings (Turkish)
+  BoundaryShield
+
+  Created by Antigravity on 2026-06-11.
+*/
+
+"app_name" = "Boundary Shield";
+"home_title" = "Bugünkü İrade";
+"stats_saved_time" = "Kazanılan Zaman";
+"active_limits" = "Aktif Sınırlar";
+"limits_reached" = "Limiti Dolanlar";
+"streak" = "Başarı Serisi";
+"add_limit" = "Yeni Sınır Ekle";
+"delete_limit" = "5 Saniye Basılı Tutarak Sil";
+"save_changes" = "Değişiklikleri Kaydet";
+"rule_name" = "Sınır Adı";
+"daily_limit" = "Günlük Limit Süresi";
+"active_days" = "Aktif Günler";
+"bypass_protection_active" = "Bypass Koruması Aktif";
+"bypass_protection_desc" = "Bypassı engellemek için süre artırma ve gün azaltma talepleri yarın gece yarısı resetinden sonra geçerli olacaktır. Süre azaltma ve kural silme hemen uygulanabilir.";
+"discipline_journey" = "Disiplin Yolculuğu";
+"discipline_desc" = "Alışkanlıkların oluşması 21 gün, karakterin oluşması ise 90 gün sürer. Bu 100 günlük blok iradenizi somutlaştırmak için tasarlanmıştır.";
+"clear_all_data" = "Tüm Verileri Temizle";
+"privacy_title" = "Veri Kullanımı ve Gizlilik Bildirgesi";
+"privacy_desc" = "Boundary Shield, tamamen çevrimdışı (offline) çalışacak şekilde tasarlanmıştır. Gizliliğiniz bizim için en yüksek önceliktir.";
+"onboarding_title" = "Boundary Shield";
+"onboarding_subtitle" = "Dijital Sınırlarını Çiz, İradeni Güçlendir";
+"onboarding_btn" = "Kuruluma Başla ve İzin Ver";
+"shield_title" = "Bugünkü Limitin Doldu";
+"shield_subtitle" = "Bu sınırı sen belirledin. Bugünlük burada dur.";
+"shield_button" = "Ana Uygulamaya Dön";
