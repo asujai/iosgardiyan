@@ -7,35 +7,13 @@
 
 import Foundation
 
-/// Motivasyon sözü veri modeli.
-public struct MotivationQuote: Codable, Identifiable, Equatable {
-    public let id: UUID
-    public var text: String
-    public var author: String
-    public var isActive: Bool
-    public var isCustom: Bool
-    
-    public init(id: UUID = UUID(), text: String, author: String = "", isActive: Bool = true, isCustom: Bool = false) {
-        self.id = id
-        self.text = text
-        self.author = author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Anonim" : author
-        self.isActive = isActive
-        self.isCustom = isCustom
-    }
-    
-    public static func == (lhs: MotivationQuote, rhs: MotivationQuote) -> Bool {
-        return lhs.id == rhs.id
-    }
-}
-
-/// Motivasyon sözlerini yöneten servis.
+/// Motivasyon sözlerini yöneten modüler servis.
 public final class QuoteManager {
     public static let shared = QuoteManager()
     
-    private let defaults: UserDefaults
+    private let store = AppGroupStore.shared
     
     private init() {
-        self.defaults = UserDefaults(suiteName: AppConfig.appGroupId) ?? UserDefaults.standard
         initializeDefaultQuotesIfNeeded()
     }
     
@@ -60,18 +38,11 @@ public final class QuoteManager {
     // MARK: - Core Operations
     
     public func loadQuotes() -> [MotivationQuote] {
-        guard let data = defaults.data(forKey: AppConfig.Keys.quotes),
-              let quotes = try? JSONDecoder().decode([MotivationQuote].self, from: data) else {
-            return []
-        }
-        return quotes
+        return store.load(forKey: AppConfiguration.Keys.quotes) ?? []
     }
     
     public func saveQuotes(_ quotes: [MotivationQuote]) {
-        if let encoded = try? JSONEncoder().encode(quotes) {
-            defaults.set(encoded, forKey: AppConfig.Keys.quotes)
-            defaults.synchronize()
-        }
+        store.save(quotes, forKey: AppConfiguration.Keys.quotes)
     }
     
     // MARK: - User Operations
@@ -81,9 +52,10 @@ public final class QuoteManager {
         let newQuote = MotivationQuote(text: text, author: author, isActive: true, isCustom: true)
         quotes.append(newQuote)
         saveQuotes(quotes)
+        
         LocalDataStore.shared.addLog(
             title: "Söz Eklendi",
-            detail: "\"\(text.prefix(30))...\" motivasyon sözü başarıyla eklendi.",
+            detail: "\"\(text.prefix(20))...\" motivasyon sözü yerel listeye eklendi.",
             type: .info
         )
     }
@@ -104,22 +76,21 @@ public final class QuoteManager {
         saveQuotes(quotes)
     }
     
-    /// Aktif ayarlara göre rastgele bir motivasyon sözü döner.
+    /// Aktif sözlerden rastgele birini getirir.
     public func getRandomActiveQuote(onlyCustom: Bool = false) -> MotivationQuote {
         let allQuotes = loadQuotes()
         
-        let filteredQuotes: [MotivationQuote]
+        let filtered: [MotivationQuote]
         if onlyCustom {
-            filteredQuotes = allQuotes.filter { $0.isActive && $0.isCustom }
+            filtered = allQuotes.filter { $0.isActive && $0.isCustom }
         } else {
-            filteredQuotes = allQuotes.filter { $0.isActive }
+            filtered = allQuotes.filter { $0.isActive }
         }
         
-        if filteredQuotes.isEmpty {
-            // Hiç aktif söz yoksa varsayılan acil durum sözü
-            return MotivationQuote(text: "Odaklan ve disiplinli kal.", author: "Boundary Shield")
+        if filtered.isEmpty {
+            return MotivationQuote(text: "Sınırlarına sadık kal ve odaklan.", author: "Boundary Shield")
         }
         
-        return filteredQuotes.randomElement() ?? MotivationQuote(text: "Odaklan ve disiplinli kal.", author: "Boundary Shield")
+        return filtered.randomElement() ?? MotivationQuote(text: "Sınırlarına sadık kal ve odaklan.", author: "Boundary Shield")
     }
 }

@@ -10,7 +10,7 @@ import ManagedSettingsUI
 import UIKit
 import Foundation
 
-// Limit dolunca resmi iOS ekranının görünümünü özelleştiren extension.
+// Limit aşımında çıkan kilit ekranının (shield) görünüm konfigürasyonu.
 public class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     
     public override func configuration(shielding application: Application) -> ShieldConfiguration {
@@ -30,7 +30,7 @@ public class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     }
     
     private func makeCustomConfiguration() -> ShieldConfiguration {
-        // App Group UserDefaults üzerinden günün sözünü alalım
+        // App Group UserDefaults üzerinden rastgele bir motivasyon sözü seçelim
         let quote = QuoteManager.shared.getRandomActiveQuote()
         
         let displayTitle = "Bugünkü Limitin Doldu"
@@ -51,7 +51,7 @@ public class ShieldConfigurationExtension: ShieldConfigurationDataSource {
                 text: "Ana Uygulamaya Dön",
                 color: .black
             ),
-            primaryButtonBackgroundColor: UIColor(red: 0.82, green: 0.45, blue: 0.32, alpha: 1.0), // Bakır Buton
+            primaryButtonBackgroundColor: UIColor(red: 0.82, green: 0.45, blue: 0.32, alpha: 1.0), // Bakır
             secondaryButtonLabel: nil
         )
     }

@@ -20,10 +20,8 @@ struct QuotesManagementView: View {
             UITheme.backgroundDark.ignoresSafeArea()
             
             VStack(spacing: 16) {
-                // Sadece benim sözlerim gösterilsin Toggle
                 toggleCard
                 
-                // Söz Listesi
                 if filteredQuotes.isEmpty {
                     emptyState
                 } else {
@@ -66,9 +64,7 @@ struct QuotesManagementView: View {
                 .tint(UITheme.copperAccent)
                 .labelsHidden()
                 .onChange(of: onlyMyQuotes) { newValue in
-                    var settings = LocalDataStore.shared.loadSettings()
-                    settings.onlyMyQuotes = newValue
-                    LocalDataStore.shared.saveSettings(settings)
+                    LocalDataStore.shared.saveOnlyMyQuotesPreference(newValue)
                 }
         }
         .padding()
@@ -224,7 +220,7 @@ struct QuotesManagementView: View {
     
     private func loadQuotesData() {
         quotes = QuoteManager.shared.loadQuotes()
-        onlyMyQuotes = LocalDataStore.shared.loadSettings().onlyMyQuotes
+        onlyMyQuotes = LocalDataStore.shared.loadOnlyMyQuotesPreference()
     }
     
     private var filteredQuotes: [MotivationQuote] {
@@ -243,11 +239,9 @@ struct QuotesManagementView: View {
     }
     
     private func deleteQuote(at offsets: IndexSet) {
-        // Hangi sözlerin silineceğini tespit edip id bazlı silelim.
         let targetQuotes = filteredQuotes
         for index in offsets {
             let quote = targetQuotes[index]
-            // Sadece özel sözlerin silinmesine izin verilsin, varsayılanlar korunsun.
             if quote.isCustom {
                 QuoteManager.shared.deleteQuote(id: quote.id)
             } else {

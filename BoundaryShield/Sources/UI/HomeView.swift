@@ -11,7 +11,7 @@ struct HomeView: View {
     @State private var isAddLimitPresented = false
     @State private var isDisciplineDetailPresented = false
     
-    @State private var rules: [ShieldRule] = []
+    @State private var rules: [AppLimitRule] = []
     @State private var disciplineState = DisciplineState()
     
     var body: some View {
@@ -21,7 +21,6 @@ struct HomeView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Üst Header
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Bugünkü İrade")
@@ -50,13 +49,10 @@ struct HomeView: View {
                         .padding(.horizontal)
                         .padding(.top, 10)
                         
-                        // İstatistikler Kartı
                         statsCard
                         
-                        // 21 Günlük Disiplin Grid'i
                         disciplineGrid
                         
-                        // Hızlı Eylemler
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Hızlı Eylemler")
                                 .font(.system(size: 16, weight: .semibold))
@@ -87,7 +83,6 @@ struct HomeView: View {
                             .padding(.horizontal)
                         }
                         
-                        // Günün Sözü Kartı
                         quoteCard
                         
                         Spacer(minLength: 40)
@@ -146,7 +141,7 @@ struct HomeView: View {
                     Text("Limiti Dolanlar")
                         .font(.caption)
                         .foregroundColor(UITheme.textSecondary)
-                    Text("\(rules.filter { $0.isShieldActiveToday }.count)")
+                    Text("\(rules.filter { $0.isFailed }.count)")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(UITheme.errorRed)
                 }
@@ -197,7 +192,6 @@ struct HomeView: View {
     }
     
     private func gridItem(for index: Int) -> some View {
-        // Son 20 günü ve bugünü grid üzerine yerleştirelim.
         let targetDate = Date().addingTimeInterval(TimeInterval(-20 + index * 24 * 3600))
         let dateKey = formatDate(targetDate)
         
@@ -212,7 +206,7 @@ struct HomeView: View {
         } else if status == "violation" {
             color = UITheme.errorRed
         } else {
-            color = Color.gray.opacity(0.2) // Veri yok
+            color = Color.gray.opacity(0.2)
         }
         
         return VStack(spacing: 4) {
@@ -233,7 +227,7 @@ struct HomeView: View {
     }
     
     private var quoteCard: some View {
-        let quote = QuoteManager.shared.getRandomActiveQuote(onlyCustom: LocalDataStore.shared.loadSettings().onlyMyQuotes)
+        let quote = QuoteManager.shared.getRandomActiveQuote(onlyCustom: LocalDataStore.shared.loadOnlyMyQuotesPreference())
         return VStack(alignment: .leading, spacing: 12) {
             Image(systemName: "quote.opening")
                 .font(.title3)
@@ -265,7 +259,6 @@ struct HomeView: View {
     }
     
     private func formatSavedTime() -> String {
-        // Tahmini kazanılan zaman: Başarılı olunan gün sayısı * 1.5 saat
         let hours = Double(disciplineState.totalSuccessDays) * 1.5
         if hours == 0 {
             return "0 sa"

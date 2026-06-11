@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Bypass girişimlerini engellemek için tasarlanmış güvenli günlük reset yöneticisi.
+/// Bypass girişimlerini önleyen ve günlük zaman aşımında kural resetlerini koordine eden güvenli günlük sıfırlama yöneticisi.
 public final class SafeDailyResetManager {
     public static let shared = SafeDailyResetManager()
     
@@ -21,10 +21,10 @@ public final class SafeDailyResetManager {
         var lastKnownTimeZoneIdentifier: String = TimeZone.current.identifier
     }
     
-    private let metadataKey = "boundaryshield_reset_metadata"
+    private let metadataKey = "boundaryshield_reset_metadata_v2"
     
     private init() {
-        self.defaults = UserDefaults(suiteName: AppConfig.appGroupId) ?? UserDefaults.standard
+        self.defaults = UserDefaults(suiteName: AppConfiguration.appGroupId) ?? UserDefaults.standard
     }
     
     private func loadMetadata() -> ResetMetadata {
@@ -42,8 +42,8 @@ public final class SafeDailyResetManager {
         }
     }
     
-    /// Günlük saatin değiştirilmesini veya geriye alınmasını kontrol eder.
-    /// Günlük reset yapılması gerekiyorsa reset işlemlerini tetikler ve true döner.
+    /// Cihaz saatinin geriye alınmasını veya bypass girişimlerini doğrular.
+    /// Yeni güne geçildiğinde ve şartlar sağlandığında sıfırlama işlemlerini tetikler ve true döner.
     public func checkAndPerformReset() -> Bool {
         let now = Date()
         let currentWallClock = now.timeIntervalSince1970
@@ -52,55 +52,50 @@ public final class SafeDailyResetManager {
         
         var metadata = loadMetadata()
         
-        // 1. Saat Geriye Alınma Kontrolü (Bypass Engelleme)
+        // 1. Saat Geriye Alınma Kontrolü
         if currentWallClock < metadata.lastKnownWallClockTime {
             LocalDataStore.shared.addLog(
-                title: "Zaman Bypass Girişimi!",
-                detail: "Cihaz saatinin geriye alındığı tespit edildi. Reset engellendi.",
+                title: "Bypass Girişimi Engellendi",
+                detail: "Cihaz saatinin geriye alındığı saptandı. Günlük reset engellendi.",
                 type: .warning
             )
-            // Son bilinen zamanı yine de en yüksek değere sabitleyelim
             return false
         }
         
-        // Son bilinen wall clock zamanını güncelle
+        // Son bilinen zamanı güncelle
         metadata.lastKnownWallClockTime = currentWallClock
         saveMetadata(metadata)
         
-        // İlk çalıştırma kontrolü
+        // İlk kurulum doğrulaması
         if metadata.lastResetDate == Date.distantPast {
             performResetActions(&metadata, now: now, currentWallClock: currentWallClock, currentUptime: currentUptime, currentTimeZone: currentTimeZone)
             return true
         }
         
-        // 2. Takvim Günü Değişim Kontrolü
+        // 2. Takvim Günü Fark Kontrolü
         let calendar = Calendar.current
         let isDifferentDay = !calendar.isDate(now, inSameDayAs: metadata.lastResetDate)
         
-        // 3. 22 Saat Kuralı Kontrolü
+        // 3. En Az 22 Saat Geçme Kontrolü
         let timeSinceLastReset = now.timeIntervalSince(metadata.lastResetDate)
-        let hasEnoughTimePassed = timeSinceLastReset >= (22 * 3600) // En az 22 saat geçmiş olmalı
+        let hasEnoughTimePassed = timeSinceLastReset >= (22 * 3600)
         
-        // Uptime farkı ve reboot kontrolü
         let isRebooted = currentUptime < metadata.lastResetSystemUptime
         
         if isDifferentDay && hasEnoughTimePassed {
-            // Güvenli günlük reset koşulları sağlandı
             performResetActions(&metadata, now: now, currentWallClock: currentWallClock, currentUptime: currentUptime, currentTimeZone: currentTimeZone)
             return true
         } else if isDifferentDay && !hasEnoughTimePassed {
-            // Gün değişmiş fakat 22 saat geçmemişse (Muhtemelen timezone veya manuel ileri alma)
             if isRebooted {
-                // Reboot edilmiş olsa dahi 22 saat geçmediyse izin vermiyoruz.
                 LocalDataStore.shared.addLog(
                     title: "Erken Gün Değişimi",
-                    detail: "Gün değişti ancak son resetten bu yana 22 saat geçmedi. Reset ertelendi.",
+                    detail: "Gün değişti fakat son resetten bu yana 22 saat geçmedi. Reset ertelendi.",
                     type: .info
                 )
             } else {
                 LocalDataStore.shared.addLog(
-                    title: "Hızlı Gün Değişimi Engellendi",
-                    detail: "Saat ileri alınarak bypass yapılmaya çalışılmış olabilir. 22 saat kuralı devrede.",
+                    title: "Manuel Bypass Engellendi",
+                    detail: "Saat ileri alınarak bypass yapılmaya çalışılmış olabilir. 22 saat kontrolü devrede.",
                     type: .warning
                 )
             }
@@ -112,51 +107,45 @@ public final class SafeDailyResetManager {
     private func performResetActions(_ metadata: inout ResetMetadata, now: Date, currentWallClock: TimeInterval, currentUptime: TimeInterval, currentTimeZone: TimeZone) {
         LocalDataStore.shared.addLog(
             title: "Güvenli Günlük Reset",
-            detail: "Yeni güne geçildi. Sınırlar sıfırlanıyor ve yarına planlanan kurallar uygulanıyor.",
+            detail: "Yeni gün kural ve limit güncellemeleri başarıyla uygulandı.",
             type: .success
         )
         
-        // Kuralları yükle ve yeni gün için resetle
         var rules = LocalDataStore.shared.loadRules()
-        var successToday = true
         var wasAnyRuleMonitoredToday = false
         
-        // Bugün aktif olan kuralları tespit edelim (Calendar haftalık gün indexi: 1-7, Pazar=1)
         let calendar = Calendar.current
         let todayWeekday = calendar.component(.weekday, from: now)
         
         for i in 0..<rules.count {
-            // Eğer dün (veya son aktif olunan gün) kural limitini aştıysa disiplin puanı düşecek
-            if rules[i].isActive && rules[i].activeDays.contains(todayWeekday) {
+            if rules[i].isActive && rules[i].activeWeekdays.contains(todayWeekday) {
                 wasAnyRuleMonitoredToday = true
-                if rules[i].isShieldActiveToday {
-                    // Shield aktifleştiyse demek ki o kuralda limite ulaşıldı (başarı veya ihlal durumuna göre karar verilebilir)
-                    // Ürün fikrine göre: süre limiti dolunca erişim engellenir, bu bir başarıdır (kullanıcı sınıra uymuş veya sınırlandırılmış).
-                    // Ancak bypass yapmaya çalıştıysa veya aşmaya zorladıysa ihlal sayılır.
-                    // Senaryo: Kural limitinin dolması normal bir başarı kabul edilir (çünkü kural çalışmıştır ve kullanıcı sınırı aşamamıştır).
-                }
             }
             
-            // Shield'ı sıfırla
-            rules[i].isShieldActiveToday = false
+            // Limit durumunu sıfırla
+            rules[i].isFailed = false
+            rules[i].currentDayState = "monitoring"
             
-            // Yarın uygulanacak planları şimdi uygula
-            if let pendingLimit = rules[i].pendingNewLimitInSeconds {
-                rules[i].dailyLimitInSeconds = pendingLimit
-                rules[i].pendingNewLimitInSeconds = nil
+            // Planlanan yeni kural sürelerini uygula
+            if let pendingLimit = rules[i].plannedNextDayLimit {
+                rules[i].dailyLimit = pendingLimit
+                rules[i].plannedNextDayLimit = nil
+                rules[i].lastUpdatedDate = now
                 LocalDataStore.shared.addLog(
-                    title: "Kural Güncellendi",
-                    detail: "'\(rules[i].name)' kuralının yeni süresi yürürlüğe girdi.",
+                    title: "Süre Güncellendi",
+                    detail: "'\(rules[i].name)' kural süresi yürürlüğe girdi.",
                     type: .info
                 )
             }
             
-            if let pendingDays = rules[i].pendingActiveDays {
-                rules[i].activeDays = pendingDays
-                rules[i].pendingActiveDays = nil
+            // Planlanan yeni aktif günleri uygula
+            if let pendingDays = rules[i].plannedNextDayActiveDays {
+                rules[i].activeWeekdays = pendingDays
+                rules[i].plannedNextDayActiveDays = nil
+                rules[i].lastUpdatedDate = now
                 LocalDataStore.shared.addLog(
-                    title: "Kural Güncellendi",
-                    detail: "'\(rules[i].name)' kuralının aktif gün değişiklikleri yürürlüğe girdi.",
+                    title: "Aktif Günler Güncellendi",
+                    detail: "'\(rules[i].name)' aktif gün planı yürürlüğe girdi.",
                     type: .info
                 )
             }
@@ -164,10 +153,13 @@ public final class SafeDailyResetManager {
         
         LocalDataStore.shared.saveRules(rules)
         
-        // Disiplin değerlendirmesi (Örn: Eğer izlenen aktif sınırlar varsa ve bypass/ihlal yapılmadıysa başarıdır)
+        // Disiplin başarı değerlendirmesi
         if wasAnyRuleMonitoredToday {
             DisciplineEngine.shared.recordSuccess(for: now)
         }
+        
+        // İzleme planlarını yeniden oluştur
+        ScreenTimeProtectionEngine.shared.refreshMonitoring()
         
         // Metadata güncelleme
         metadata.lastResetDate = now

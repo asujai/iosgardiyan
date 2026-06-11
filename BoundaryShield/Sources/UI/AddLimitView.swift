@@ -15,7 +15,7 @@ struct AddLimitView: View {
     @State private var selection = FamilyActivitySelection()
     @State private var limitHour: Int = 1
     @State private var limitMinute: Int = 0
-    @State private var activeDays: Set<Int> = Set([2, 3, 4, 5, 6]) // Varsayılan: Hafta içi (Pzt:2, Sal:3, vs.)
+    @State private var activeDays: Set<Int> = Set([2, 3, 4, 5, 6]) // Varsayılan: Hafta içi
     
     let weekdays = [
         (2, "Pzt"), (3, "Sal"), (4, "Çar"), (5, "Per"), (6, "Cum"), (7, "Cmt"), (1, "Paz")
@@ -28,7 +28,6 @@ struct AddLimitView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Kural Adı Girişi
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Sınır Adı")
                                 .font(.caption)
@@ -45,19 +44,15 @@ struct AddLimitView: View {
                                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                                 )
                         }
-                        .padding(.horizontal)
                         .padding(.top, 10)
+                        .padding(.horizontal)
                         
-                        // Uygulama Seçim Bölümü
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Uygulama ve Kategoriler")
                                 .font(.caption)
                                 .foregroundColor(UITheme.textSecondary)
                                 .textCase(.uppercase)
                             
-                            // FamilyActivityPicker (Resmi iOS Seçicisi)
-                            // Not: Simülatörde ve Xcode yetkilendirmesi olmadan boş görünebilir.
-                            // Gerçek cihazda ve onaylı entitlement ile çalışacaktır.
                             FamilyActivityPicker(headerText: "Kısıtlanacak Uygulamaları Seçin", selection: $selection)
                                 .frame(height: 250)
                                 .background(UITheme.cardDark)
@@ -69,7 +64,6 @@ struct AddLimitView: View {
                         }
                         .padding(.horizontal)
                         
-                        // Süre Limiti Seçici
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Günlük Limit Süresi")
                                 .font(.caption)
@@ -103,7 +97,6 @@ struct AddLimitView: View {
                         }
                         .padding(.horizontal)
                         
-                        // Aktif Gün Seçici
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Aktif Günler")
                                 .font(.caption)
@@ -139,7 +132,6 @@ struct AddLimitView: View {
                         }
                         .padding(.horizontal)
                         
-                        // Kaydet Butonu
                         Button(action: saveRule) {
                             Text("Sınırı Kaydet ve Aktifleştir")
                                 .font(.system(size: 16, weight: .bold))
@@ -181,13 +173,14 @@ struct AddLimitView: View {
     private func saveRule() {
         let totalSeconds = TimeInterval((limitHour * 3600) + (limitMinute * 60))
         
-        let newRule = ShieldRule(
+        let newRule = AppLimitRule(
             name: ruleName,
             selection: selection,
-            dailyLimitInSeconds: totalSeconds,
-            activeDays: activeDays,
+            dailyLimit: totalSeconds,
+            activeWeekdays: activeDays,
+            currentDayState: "monitoring",
             isActive: true,
-            isShieldActiveToday: false
+            isFailed: false
         )
         
         var currentRules = LocalDataStore.shared.loadRules()
@@ -195,11 +188,11 @@ struct AddLimitView: View {
         LocalDataStore.shared.saveRules(currentRules)
         
         // Monitoring başlat
-        ProtectionEngine.shared.startMonitoring(rule: newRule)
+        ScreenTimeProtectionEngine.shared.startMonitoring(rule: newRule)
         
         LocalDataStore.shared.addLog(
-            title: "Yeni Sınır Eklendi",
-            detail: "'\(ruleName)' adlı kural başarıyla oluşturuldu ve izlemeye alındı.",
+            title: "Sınır Oluşturuldu",
+            detail: "'\(ruleName)' adlı kısıtlama kuralı oluşturuldu ve izlenmeye başlandı.",
             type: .success
         )
         

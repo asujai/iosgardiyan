@@ -10,7 +10,7 @@ import SwiftUI
 struct RuleManagementSheet: View {
     @Environment(\.dismiss) var dismiss
     
-    let rule: ShieldRule
+    let rule: AppLimitRule
     var onUpdate: () -> Void
     
     @State private var ruleName: String = ""
@@ -27,16 +27,15 @@ struct RuleManagementSheet: View {
         (2, "Pzt"), (3, "Sal"), (4, "Çar"), (5, "Per"), (6, "Cum"), (7, "Cmt"), (1, "Paz")
     ]
     
-    init(rule: ShieldRule, onUpdate: @escaping () -> Void) {
+    init(rule: AppLimitRule, onUpdate: @escaping () -> Void) {
         self.rule = rule
         self.onUpdate = onUpdate
         
-        // State'leri başlangıçta kural verileriyle dolduralım
-        let totalMinutes = Int(rule.dailyLimitInSeconds) / 60
+        let totalMinutes = Int(rule.dailyLimit) / 60
         _ruleName = State(initialValue: rule.name)
         _limitHour = State(initialValue: totalMinutes / 60)
         _limitMinute = State(initialValue: totalMinutes % 60)
-        _selectedDays = State(initialValue: rule.activeDays)
+        _selectedDays = State(initialValue: rule.activeWeekdays)
     }
     
     var body: some View {
@@ -46,10 +45,8 @@ struct RuleManagementSheet: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Bilgilendirme Uyarısı
                         infoAlert
                         
-                        // Kural Adı
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Sınır Adı")
                                 .font(.caption)
@@ -64,7 +61,6 @@ struct RuleManagementSheet: View {
                         }
                         .padding(.horizontal)
                         
-                        // Limit Ayarı
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Limit Süresi")
                                 .font(.caption)
@@ -94,7 +90,6 @@ struct RuleManagementSheet: View {
                         }
                         .padding(.horizontal)
                         
-                        // Gün Seçimi
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Aktif Günler")
                                 .font(.caption)
@@ -126,7 +121,6 @@ struct RuleManagementSheet: View {
                         }
                         .padding(.horizontal)
                         
-                        // Güncelle ve Kaydet Butonu
                         Button(action: saveChanges) {
                             Text("Değişiklikleri Kaydet")
                                 .font(.system(size: 16, weight: .bold))
@@ -143,7 +137,6 @@ struct RuleManagementSheet: View {
                             .background(Color.white.opacity(0.1))
                             .padding()
                         
-                        // 5 Saniye Basılı Tutarak Silme Butonu
                         deleteButton
                             .padding(.horizontal)
                             .padding(.bottom, 30)
@@ -193,9 +186,7 @@ struct RuleManagementSheet: View {
                 .foregroundColor(UITheme.textSecondary)
                 .textCase(.uppercase)
             
-            // Custom Long Press Delete Button
             ZStack(alignment: .leading) {
-                // Arka plan ilerleme barı
                 GeometryReader { geo in
                     RoundedRectangle(cornerRadius: 12)
                         .fill(UITheme.errorRed.opacity(0.25))
@@ -244,19 +235,19 @@ struct RuleManagementSheet: View {
         let newSeconds = TimeInterval((limitHour * 3600) + (limitMinute * 60))
         
         // 1. Süre Artış Kontrolü (Aynı gün artış engellenir, yarına planlanır)
-        if newSeconds > rule.dailyLimitInSeconds {
-            rules[index].pendingNewLimitInSeconds = newSeconds
+        if newSeconds > rule.dailyLimit {
+            rules[index].plannedNextDayLimit = newSeconds
             LocalDataStore.shared.addLog(
                 title: "Limit Artışı Planlandı",
                 detail: "'\(rule.name)' limit artış talebi bypass koruması nedeniyle yarına planlandı.",
                 type: .info
             )
-        } else if newSeconds < rule.dailyLimitInSeconds {
+        } else if newSeconds < rule.dailyLimit {
             // Süre azaltımı hemen uygulanabilir
-            rules[index].dailyLimitInSeconds = newSeconds
-            rules[index].pendingNewLimitInSeconds = nil
+            rules[index].dailyLimit = newSeconds
+            rules[index].plannedNextDayLimit = nil
             // İzlemeyi güncelle
-            ProtectionEngine.shared.startMonitoring(rule: rules[index])
+            ScreenTimeProtectionEngine.shared.startMonitoring(rule: rules[index])
             LocalDataStore.shared.addLog(
                 title: "Limit Azaltıldı",
                 detail: "'\(rule.name)' kural limiti hemen uygulandı.",
@@ -265,8 +256,8 @@ struct RuleManagementSheet: View {
         }
         
         // 2. Aktif Gün Değişikliği (Yarına planlanır)
-        if selectedDays != rule.activeDays {
-            rules[index].pendingActiveDays = selectedDays
+        if selectedDays != rule.activeWeekdays {
+            rules[index].plannedNextDayActiveDays = selectedDays
             LocalDataStore.shared.addLog(
                 title: "Gün Değişikliği Planlandı",
                 detail: "'\(rule.name)' aktif gün değişiklikleri yarına planlandı.",
@@ -275,6 +266,7 @@ struct RuleManagementSheet: View {
         }
         
         rules[index].name = ruleName
+        rules[index].lastUpdatedDate = Date()
         LocalDataStore.shared.saveRules(rules)
         onUpdate()
         dismiss()
@@ -288,9 +280,8 @@ struct RuleManagementSheet: View {
         
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             if deleteProgress < 1.0 {
-                deleteProgress += 0.02 // 0.1 saniyede %2 artış -> 5 saniyede %100 olur
+                deleteProgress += 0.02 // 5 saniyede %100
             } else {
-                // 5 saniye tamamlandı, silme işlemini yap
                 stopDeleteTimer()
                 performDelete()
             }
@@ -302,7 +293,6 @@ struct RuleManagementSheet: View {
         timer?.invalidate()
         timer = nil
         
-        // Eğer tamamlanmadan bırakıldıysa sıfırla
         if deleteProgress < 1.0 {
             deleteProgress = 0.0
         }
@@ -314,19 +304,15 @@ struct RuleManagementSheet: View {
         LocalDataStore.shared.saveRules(rules)
         
         // Monitoring sonlandır ve shield kaldır
-        ProtectionEngine.shared.stopMonitoring(rule: rule)
+        ScreenTimeProtectionEngine.shared.stopMonitoring(rule: rule)
         
         LocalDataStore.shared.addLog(
-            title: "Sınır Kuralı Silindi",
-            detail: "'\(rule.name)' kuralı basılı tutularak silindi ve takibi sonlandırıldı.",
+            title: "Sınır Silindi",
+            detail: "'\(rule.name)' kısıtlama kuralı basılı tutularak silindi.",
             type: .warning
         )
         
         onUpdate()
         dismiss()
     }
-}
-
-#Preview {
-    RuleManagementSheet(rule: ShieldRule(name: "Test Sınırı", dailyLimitInSeconds: 3600)) {}
 }

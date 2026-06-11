@@ -9,25 +9,25 @@ import SwiftUI
 
 @main
 struct BoundaryShieldApp: App {
-    @StateObject private var protectionEngine = ProtectionEngine.shared
+    @StateObject private var authManager = ScreenTimeAuthorizationManager.shared
     @State private var hasCheckedReset = false
-    @AppStorage("boundaryshield_app_theme") private var savedTheme: String = "system"
+    @AppStorage(AppConfiguration.Keys.theme) private var savedTheme: String = "system"
     
     init() {
-        // Güvenli günlük reset kontrolü
+        // Güvenli günlük reset doğrulaması
         _ = SafeDailyResetManager.shared.checkAndPerformReset()
     }
     
     var body: some Scene {
         WindowGroup {
             Group {
-                if protectionEngine.authorizationStatus == .approved {
+                if authManager.authorizationStatus == .approved {
                     MainTabView()
                 } else {
                     OnboardingView()
                 }
             }
-            .environmentObject(protectionEngine)
+            .environmentObject(authManager)
             .preferredColorScheme(selectedColorScheme)
             .onAppear {
                 if !hasCheckedReset {
@@ -42,7 +42,7 @@ struct BoundaryShieldApp: App {
         switch savedTheme {
         case "light": return .light
         case "dark", "premiumDark": return .dark
-        default: return nil // System theme
+        default: return nil
         }
     }
 }

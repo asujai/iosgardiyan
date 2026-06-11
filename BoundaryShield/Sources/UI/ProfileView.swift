@@ -8,15 +8,14 @@
 import SwiftUI
 
 struct ProfileView: View {
-    @AppStorage("boundaryshield_app_theme") private var savedTheme: String = "system"
-    @AppStorage("boundaryshield_app_language") private var savedLanguage: String = "tr"
+    @AppStorage(AppConfiguration.Keys.theme) private var savedTheme: String = "system"
+    @AppStorage(AppConfiguration.Keys.language) private var savedLanguage: String = "tr"
     
     @State private var disciplineState = DisciplineState()
     @State private var rulesCount: Int = 0
-    @State private var logs: [AppLog] = []
-    @State private var settings = AppSettings()
+    @State private var logs: [StatusLog] = []
+    @State private var onlyMyQuotes = false
     
-    @State private var isQuotesPresented = false
     @State private var isPrivacyPresented = false
     @State private var isClearDataAlertPresented = false
     
@@ -27,13 +26,10 @@ struct ProfileView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Profil kartı (Seviye ve Kırmızı Rozet)
                         profileHeaderCard
                         
-                        // İstatistikler Grid'i
                         statsGrid
                         
-                        // Ayarlar Bölümü
                         VStack(alignment: .leading, spacing: 12) {
                             Text("AYARLAR")
                                 .font(.caption)
@@ -42,24 +38,20 @@ struct ProfileView: View {
                                 .padding(.horizontal)
                             
                             VStack(spacing: 0) {
-                                // Tema Seçimi
                                 themeRow
                                 
                                 Divider().background(Color.white.opacity(0.05))
                                 
-                                // Dil Seçimi
                                 languageRow
                                 
                                 Divider().background(Color.white.opacity(0.05))
                                 
-                                // Motivasyon Sözleri
                                 NavigationLink(destination: QuotesManagementView()) {
                                     settingNavigationRow(icon: "quote.bubble.fill", title: "Motivasyon Sözlerim")
                                 }
                                 
                                 Divider().background(Color.white.opacity(0.05))
                                 
-                                // Gizlilik & Veri Kullanımı
                                 Button(action: { isPrivacyPresented = true }) {
                                     settingNavigationRow(icon: "lock.doc.fill", title: "Veri Kullanımı ve Gizlilik")
                                 }
@@ -69,10 +61,8 @@ struct ProfileView: View {
                             .padding(.horizontal)
                         }
                         
-                        // Aktivite Günlüğü (Log / Timeline)
                         activityTimeline
                         
-                        // Kritik Eylemler (Sıfırlama)
                         VStack(spacing: 12) {
                             Button(action: {
                                 isClearDataAlertPresented = true
@@ -94,7 +84,7 @@ struct ProfileView: View {
                             }
                             .padding(.horizontal)
                             
-                            Text("Boundary Shield v1.0.0 — Native iOS")
+                            Text("Boundary Shield v1.1.0 — Native iOS")
                                 .font(.caption2)
                                 .foregroundColor(UITheme.textSecondary)
                                 .padding(.top, 10)
@@ -127,7 +117,6 @@ struct ProfileView: View {
     
     private var profileHeaderCard: some View {
         VStack(spacing: 16) {
-            // Seviye Crown
             ZStack {
                 Circle()
                     .fill(disciplineState.hasRedBadge ? UITheme.errorRed.opacity(0.15) : UITheme.copperAccent.opacity(0.15))
@@ -215,6 +204,11 @@ struct ProfileView: View {
                 Text("Premium").tag("premiumDark")
             }
             .tint(UITheme.copperAccent)
+            .onChange(of: savedTheme) { val in
+                if let pref = ThemePreference(rawValue: val) {
+                    LocalDataStore.shared.saveThemePreference(pref)
+                }
+            }
         }
         .padding()
     }
@@ -232,6 +226,11 @@ struct ProfileView: View {
                 Text("English").tag("en")
             }
             .tint(UITheme.copperAccent)
+            .onChange(of: savedLanguage) { val in
+                if let pref = LanguagePreference(rawValue: val) {
+                    LocalDataStore.shared.saveLanguagePreference(pref)
+                }
+            }
         }
         .padding()
     }
@@ -356,10 +355,10 @@ struct ProfileView: View {
         disciplineState = DisciplineEngine.shared.loadState()
         rulesCount = LocalDataStore.shared.loadRules().count
         logs = LocalDataStore.shared.loadLogs()
-        settings = LocalDataStore.shared.loadSettings()
+        onlyMyQuotes = LocalDataStore.shared.loadOnlyMyQuotesPreference()
     }
     
-    private func logColor(for type: LogType) -> Color {
+    private func logColor(for type: LogSeverity) -> Color {
         switch type {
         case .success: return UITheme.successGreen
         case .error: return UITheme.errorRed
@@ -386,24 +385,16 @@ struct ProfileView: View {
     }
     
     private func clearAllDataAndShields() {
-        // Shield'leri temizle ve izlemeyi durdur
-        ProtectionEngine.shared.clearAllShields()
+        // Tüm monitoringleri durdur ve kilitleri kaldır
+        ScreenTimeProtectionEngine.shared.clearAllMonitoring()
         
         // Yerel verileri sıfırla
         LocalDataStore.shared.clearAllData()
         
-        // Yeniden yükle
+        // Profil verilerini yenile
         loadProfileData()
         
-        // Onboarding'e geri dönmek için yetki durumunu sıfırla
-        // (Gerçek hayatta bu tetiklendiğinde uygulama izin ekranına yönlenir)
-        // Burada UserDefaults yetki durumunu simüle edebiliriz.
-        // Yetki durumunu tetiklemek için Notification atabiliriz.
-        // Ana akış yetkisizliğe düşünce OnboardingView açılacaktır.
-        // Biz simülasyon amacıyla yetki durumunu çekeceğiz.
-        // Kullanıcı tüm verileri sıfırladıktan sonra uygulamadan çıkabilir veya yeniden izin alabilir.
-        
-        // Bildirim gönderme
+        // Yetki durum bildirimini tetikle
         NotificationCenter.default.post(name: NSNotification.Name("AuthorizationCenterDidChange"), object: nil)
     }
 }

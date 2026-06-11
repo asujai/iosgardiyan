@@ -1,82 +1,89 @@
 # Boundary Shield - iOS Dijital Disiplin Uygulaması
 
-Boundary Shield, kullanıcının belirlediği dijital sınırları aşmasını engelleyen, motivasyon serileri ve disiplin sistemiyle donatılmış, %100 native ve yerel bir iOS uygulamasıdır. 
+Boundary Shield, kullanıcının belirlediği dijital sınırları aşmasını engelleyen, motivasyon serileri ve disiplin sistemiyle donatılmış, %100 native ve yerel (local-only) çalışan bir iOS uygulamasıdır.
 
-Uygulama, üçüncü taraf SDK'lar veya internet erişimi kullanmaksızın, Apple'ın resmi **Screen Time (Aile Denetimleri)** API altyapısını kullanarak doğrudan işletim sistemi düzeyinde koruma sağlar.
+Uygulama, üçüncü taraf SDK'lar veya herhangi bir sunucu bağlantısı olmaksızın, Apple'ın resmi **FamilyControls**, **DeviceActivity** ve **ManagedSettings** API altyapısını kullanarak doğrudan işletim sistemi düzeyinde koruma sağlar.
 
 ---
 
-## 1. Geliştirme Ortamı ve Mimari
+## 1. Proje ve Target Yapısı
 
-Bu proje, **Windows** üzerinde kodlama yapılması ve **macOS / Xcode** üzerinde derlenmesi mantığıyla taşınabilir bir yapıda kurulmuştur.
+Proje, macOS ortamına aktarıldığında tek komutla Xcode projesi üretilebilmesi için **XcodeGen** yapısı ile yapılandırılmıştır.
+
+### Target Listesi
+1. **`BoundaryShield`**: Ana SwiftUI uygulaması. Arayüz ekranları, onboarding, profil ve ayarları barındırır.
+2. **`BoundaryShieldDeviceActivityMonitor`**: Günlük süre limit aşımlarını izleyen arka plan servis extension'ı.
+3. **`BoundaryShieldShieldConfiguration`**: Limit dolduğunda tetiklenen kilit ekranını (shield) özelleştiren extension.
+4. **`BoundaryShieldShieldAction`**: Kilit ekranı üzerindeki eylemleri yakalayan ve bypass engeli uygulayan extension.
+5. **`BoundaryShieldTests`**: Core mantık birim testlerini içeren XCTest target'ı.
 
 ### Klasör Yapısı
-* `BoundaryShield/Sources/Core/`: Uygulama yapılandırmaları, veri deposu, bypass engelleme ve disiplin motorları.
-* `BoundaryShield/Sources/UI/`: SwiftUI tabanlı modern, karanlık mod (obsidyen) ve bakır renk şemalı ekran tasarımları.
-* `BoundaryShield/Sources/Extensions/`: iOS Screen Time Extension target kodları (Monitor, Shield Config, Shield Action).
-* `BoundaryShield/Sources/Resources/`: Türkçe ve İngilizce dil destekleri.
-* `BoundaryShield/Tests/`: Mimarinin iş mantığını test eden XCTest birim testleri.
+* `BoundaryShield/Sources/Core/`: Veri modelleri, thread-safe AppGroup veri deposu, reset yöneticisi, yetkilendirme ve koruma motorları.
+* `BoundaryShield/Sources/UI/`: SwiftUI tabanlı modern, obsidian/bakır renk şemalı ekran tasarımları.
+* `BoundaryShield/Sources/Extensions/`: Screen Time uzantı kodları.
+* `BoundaryShield/Sources/Resources/`: Entitlements, Info.plist ve yerelleştirme (Localization) dosyaları.
+* `BoundaryShield/Tests/`: Birim testleri (`XCTestCase`).
 
 ---
 
-## 2. Development on Windows (Windows Üzerinde Geliştirme)
+## 2. Geliştirme ve Proje Üretme Rehberi
 
-> [!NOTE]
-> Bu proje Windows bilgisayarda düzenlenebilir ve Git aracılığıyla yönetilebilir durumdadır. Ancak projenin derlenebilmesi ve test edilebilmesi için macOS gereklidir.
+### Windows Ortamında Yapılabilecekler:
+* Kod düzenleme ve yeni arayüzler geliştirme.
+* Git versiyon kontrol işlemlerini yönetmek.
+* Statik dosyaları ve `project.yml` dosyasını yapılandırmak.
 
-### Windows'ta Yapabilecekleriniz:
-* Swift ve SwiftUI kaynak kodlarını düzenlemek ve genişletmek.
-* Git versiyon kontrol işlemlerini yürütmek.
-* Statik dosyaları ve yerelleştirme (localization) verilerini yönetmek.
+### macOS Ortamında Xcode Projesi Üretme Adımları:
+1. macOS cihazınıza **XcodeGen** kurun:
+   ```bash
+   brew install xcodegen
+   ```
+2. Proje dizinine giderek Xcode projesini üretin:
+   ```bash
+   xcodegen generate
+   ```
+3. Bu komut, dizindeki `project.yml` dosyasını okuyarak `BoundaryShield.xcodeproj` projesini tüm target'lar, entitlements referansları ve Info.plist yapılandırmalarıyla otomatik olarak oluşturacaktır.
 
-### Windows'ta Yapamayacaklarınız (Mac/Xcode Gerektiren Noktalar):
-* Xcode Simülatöründe çalıştırma ve arayüz testleri.
-* iOS cihazına yükleme, provisioning profile ve signing (imzalama) işlemleri.
-* Gerçek Screen Time API (FamilyActivityPicker) ve Shield Extension testleri.
-
----
-
-## 3. macOS / Xcode Derleme ve Kurulum Adımları
-
-Projenin macOS ortamına taşınmasından sonra derlenip çalıştırılması için şu adımlar izlenmelidir:
-
-1. **Boş Proje Oluşturma**: Xcode'da `BoundaryShield` adında yeni bir SwiftUI projesi açın. Bundle ID olarak `com.asujai.boundaryshield` kullanın.
-2. **Extension Target'ları Ekleme**: Projeye 3 adet yeni Target ekleyin:
-   * **Device Activity Monitor Extension**: (Dosya ismi: `DeviceActivityMonitorExtension.swift`)
-   * **Shield Configuration Extension**: (Dosya ismi: `ShieldConfigurationExtension.swift`)
-   * **Shield Action Extension**: (Dosya ismi: `ShieldActionExtension.swift`)
-3. **App Group Etkinleştirme**:
-   * Ana uygulama ve her 3 extension için `Signing & Capabilities` sekmesinden `App Groups` entitlement'ını ekleyin.
-   * Grup ismi olarak `group.com.asujai.boundaryshield` tanımlayın.
-4. **Kod Dosyalarını Ekleme**: Windows'ta hazırlanan `Sources` altındaki kod dosyalarını Xcode projenize sürükleyip ilgili target referanslarını vererek dahil edin.
-5. **İzin Bildirimleri (Info.plist)**: Ana uygulamanın `Info.plist` dosyasına Aile Kontrolü (`FamilyControls`) için izin açıklamalarını ekleyin.
+### İmzalama ve Çalıştırma Notları:
+* Hem ana uygulama hem de extension'lar `group.com.asujai.boundaryshield` App Group entitlements tanımına bağlıdır.
+* Gerçek cihazda Screen Time yetkilerini test edebilmek için Apple Developer hesabına ait bir Provisioning Profile ile projeyi Xcode üzerinde imzalamanız gerekmektedir.
 
 ---
 
-## 4. iOS ve Android Kısıt Farklılıkları
+## 3. Güvenlik ve Bypass Engelleme Mekanizmaları
 
-iOS işletim sisteminin yüksek güvenlik ve gizlilik politikaları nedeniyle, koruma uygulamaları Android'e kıyasla farklı çalışır:
+* **22 Saat Kuralı**: Cihaz saatinin manuel ileri alınarak serinin haksız yere artırılmasını veya sıfırlanmasını engeller.
+* **Zaman Geriye Alma Tespiti**: Sistem uptime ve wall-clock takipleriyle saatin geriye alınarak limitlerin devre dışı bırakılmasını engeller.
+* **Ertelenmiş Güncellemeler**: Süre limiti artışları ve aktif gün azaltma talepleri anında uygulanmaz, sonraki gün sıfırlanmasında (reset) devreye girer.
+* **Korumalı Silme**: Sınır kuralının silinmesi için silme butonuna 5 saniye kesintisiz basılı tutulması gerekir.
+* **Tavizsiz Kilit**: Shield Action Extension ile kilit ekranı buton eylemlerinde bypass engellenir ve kullanıcının kilit altındaki uygulamaya erişmesine izin verilmez.
 
-| Özellik | Android Yaklaşımı | iOS Native Yaklaşımı (Boundary Shield) |
-| :--- | :--- | :--- |
-| **Uygulama Listeleme** | Tüm sistem uygulamaları okunabilir. | Güvenlik nedeniyle listelenemez. Bunun yerine sistemin resmi `FamilyActivityPicker` arayüzü tetiklenir. |
-| **Ekran Kilitleme** | Diğer uygulamaların üzerine custom overlay çizilir. | Custom overlay yasaktır. Sistem düzeyinde resmi `ManagedSettingsStore` shield ekranı tetiklenir. |
-| **Arka Plan Takibi** | Arka planda sınırsız çalışan servis kurulur. | Arka planda sürekli takip yasaktır. Takip, Apple'ın `DeviceActivity` servisine devredilir. |
-| **Kolay Bypass** | Uygulama kapatılarak bypass edilebilir. | Kilit ekranı extension'ı (`ShieldActionDelegate`) ile bypass tamamen engellenir. |
+---
+
+## 4. Testleri Çalıştırma
+
+macOS ortamında birim testleri koşturmak için:
+* Xcode üzerinde `Cmd + U` kısayolunu kullanabilir veya terminalden aşağıdaki komutla test edebilirsiniz:
+  ```bash
+  xcodebuild test -project BoundaryShield.xcodeproj -scheme BoundaryShieldTests -destination 'platform=iOS Simulator,name=iPhone 15'
+  ```
+
+### Test Edilen Senaryolar:
+1. `SafeDailyResetManagerTests`: 22 saat dolmadan reset yapılmaması, zaman geriye alındığında bypass korumasının devreye girmesi.
+2. `DisciplineEngineTests`: İhlal durumunda seviye sıfırlanması, kırmızı rozet atanması ve 2 başarılı gün sonrasında telafi edilmesi.
+3. `RuleEditingTests`: Limit artırımının yarına planlanması, limit azaltımının anında uygulanması.
+4. `LocalDataStoreTests`: Verilerin atomik ve tutarlı bir şekilde UserDefaults'a yazılıp okunması.
+5. `QuoteManagerTests`: Söz ekleme/silme ve random getirme doğrulamaları.
 
 ---
 
 ## 5. Gerçek Cihaz Test Kontrol Listesi (Checklist)
 
-Mac/Xcode ile cihazınıza yükledikten sonra aşağıdaki akışları sırayla test edin:
-
-* `[ ]` **FamilyControls Yetkilendirmesi**: İlk açılışta Screen Time izni istendiğinde onaylanıyor mu? Reddedilirse açıklayıcı boş durum gösteriliyor mu?
-* `[ ]` **FamilyActivityPicker Seçimi**: Yeni sınır eklerken uygulamalar başarıyla seçilebiliyor ve kaydediliyor mu?
-* `[ ]` **DeviceActivity İzleme**: Belirlenen süre sınırı boyunca arkaplanda izleme hatasız başlıyor mu?
-* `[ ]` **Limit Aşımı ve Shield**: Süre limiti dolduğunda kilit ekranı (Shield) anında devreye giriyor mu?
-* `[ ]` **Motivasyon Sözü Gösterimi**: Shield ekranında günün sözü yazar ismiyle birlikte şık bir şekilde gösteriliyor mu?
-* `[ ]` **Bypass Engelleme**: Shield ekranındaki "Tamam" veya "Ana Uygulamaya Dön" butonuna basıldığında kilit aşılıyor mu? (Aşılmaması, kilitli kalması gerekir).
-* `[ ]` **Bypass Korumalı Kural Yönetimi**: Aynı gün limit artışı istendiğinde bunun yarına planlandığı doğrulanıyor mu? (Süre azaltımı hemen uygulanmalıdır).
-* `[ ]` **5 Saniye Basılı Tutarak Silme**: Kural silme butonu 5 saniye basılı tutulmadan silme işlemini engelliyor mu? Basılı tutarken ilerleme görselleştiriliyor mu?
-* `[ ]` **Güvenli Günlük Reset**: Gece yarısından sonra ve en az 22 saat geçtiğinde limitler başarıyla sıfırlanıp yeni gün başarı/seri puanı veriliyor mu? (Saat geriye alınarak bypass yapılmaya çalışıldığında sıfırlamanın engellendiğini doğrulayın).
-* `[ ]` **Tüm Verileri Temizleme**: Profil ekranından veriler temizlendiğinde tüm izlemeler durdurulup shield'lar kaldırılıyor mu?
+* `[ ]` **FamilyControls İzni**: İlk açılışta Screen Time yetkilendirmesi hatasız alınıyor mu?
+* `[ ]` **Uygulama Seçimi**: `FamilyActivityPicker` üzerinden kısıtlanacak uygulamalar başarıyla seçilebiliyor mu?
+* `[ ]` **Süre Sınırı Takibi**: Limit aşıldığında Device Activity Monitor arka planda kısıtlamayı tetikliyor mu?
+* `[ ]` **Kilit Ekranı (Shield)**: Limit aşılınca kilit ekranı açılıyor ve motivasyon sözü gösteriliyor mu?
+* `[ ]` **Kilit Eylemi (Bypass Engeli)**: Kilit ekranı üzerindeki eylem butonu bypass etmeden korumayı sürdürüyor mu?
+* `[ ]` **Zaman Planlamaları**: Süre artışı yapıldığında yarına ertelenirken, süre azaltımı hemen uygulanıyor mu?
+* `[ ]` **5s Buton Basılı Tutma**: Silme eyleminde 5 saniye basılı tutulması zorunlu kılınıyor mu?
+* `[ ]` **Tüm Verileri Temizleme**: Sıfırlama yapıldığında tüm korumalar ve veriler temizleniyor mu?

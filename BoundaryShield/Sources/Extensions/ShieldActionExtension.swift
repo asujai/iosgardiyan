@@ -8,7 +8,7 @@
 import ManagedSettings
 import Foundation
 
-// Kilit ekranındaki buton aksiyonlarını yöneten ve kolay bypass'ı engelleyen extension.
+// Kilit ekranındaki buton aksiyonlarını yöneten ve bypass'ı engelleyen extension.
 public class ShieldActionExtension: ShieldActionDelegate {
     
     public override func handle(action: ShieldAction, for application: Application, completionHandler: @escaping (ShieldActionOutcome) -> Void) {
@@ -26,15 +26,13 @@ public class ShieldActionExtension: ShieldActionDelegate {
     private func handleShieldAction(_ action: ShieldAction, completionHandler: @escaping (ShieldActionOutcome) -> Void) {
         switch action {
         case .primaryButtonPressed:
-            // "Ana Uygulamaya Dön" butonuna basıldığında shield KALDIRILMAZ,
-            // sadece eylem ertelenir veya tamamlanır. Kolay bypass olmaması için completionHandler'a (.defer) dönüyoruz.
-            // Bu sayede sistem engellemeye devam eder ve kullanıcı bypass edemez.
+            // "Ana Uygulamaya Dön" butonuna basıldığında shield KALDIRILMAZ
             LocalDataStore.shared.addLog(
                 title: "Kilit Ekranı Eylemi",
                 detail: "Kullanıcı kilit ekranındaki ana butona bastı. Erişim engeli korunuyor.",
                 type: .info
             )
-            completionHandler(.none) // Kilit ekranı kapanmaz, bypass engellenir.
+            completionHandler(.none) // Kilit ekranı kapatılmaz, bypass engellenir.
             
         case .secondaryButtonPressed:
             completionHandler(.none)

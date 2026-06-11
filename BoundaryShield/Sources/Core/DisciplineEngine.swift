@@ -7,50 +7,27 @@
 
 import Foundation
 
-/// Disiplin durumunu temsil eden veri modeli.
-public struct DisciplineState: Codable {
-    public var level: Int = 1
-    public var consecutiveSuccessDays: Int = 0
-    public var totalSuccessDays: Int = 0
-    public var hasRedBadge: Bool = false
-    public var activeRedemptionDaysLeft: Int = 0
-    public var redemptionStreakGoal: Int = 2
-    public var lastSuccessDate: Date? = nil
-    public var lastViolationDate: Date? = nil
-    /// 100 günlük disiplin grid kaydı (Tarih string'i -> Durum: "success", "violation")
-    public var dailyHistory: [String: String] = [:]
-}
-
-/// Disiplin, başarı, seviye ve ihlal yönetimini kontrol eden motor.
+/// Disiplin, başarı, seviye ve ihlal kurallarını kontrol eden motor.
 public final class DisciplineEngine {
     public static let shared = DisciplineEngine()
     
-    private let defaults: UserDefaults
+    private let store = AppGroupStore.shared
     
-    private init() {
-        self.defaults = UserDefaults(suiteName: AppConfig.appGroupId) ?? UserDefaults.standard
-    }
+    private init() {}
     
     // MARK: - State Management
     
     public func loadState() -> DisciplineState {
-        guard let data = defaults.data(forKey: AppConfig.Keys.disciplineState),
-              let state = try? JSONDecoder().decode(DisciplineState.self, from: data) else {
-            return DisciplineState()
-        }
-        return state
+        return store.load(forKey: AppConfiguration.Keys.disciplineState) ?? DisciplineState()
     }
     
     public func saveState(_ state: DisciplineState) {
-        if let encoded = try? JSONEncoder().encode(state) {
-            defaults.set(encoded, forKey: AppConfig.Keys.disciplineState)
-            defaults.synchronize()
-        }
+        store.save(state, forKey: AppConfiguration.Keys.disciplineState)
     }
     
-    // MARK: - Actions
+    // MARK: - Core Operations
     
-    /// Günlük başarı durumunu işler.
+    /// Günlük başarı serisini işler.
     public func recordSuccess(for date: Date = Date()) {
         var state = loadState()
         let dateKey = formatDate(date)
@@ -68,14 +45,18 @@ public final class DisciplineEngine {
             if state.activeRedemptionDaysLeft == 0 {
                 state.hasRedBadge = false
                 LocalDataStore.shared.addLog(
-                    title: "Kırmızı Rozet Kaldırıldı",
-                    detail: "2 günlük telafi serisini başarıyla tamamladınız ve kırmızı rozetten kurtuldunuz!",
+                    title: "Rozet Temizlendi",
+                    detail: "2 günlük başarı telafi serisini tamamlayarak Kırmızı Rozet'i kaldırdınız!",
                     type: .success
+                )
+                NotificationManager.shared.sendLocalNotification(
+                    title: "İrade Madalyası",
+                    body: "Kırmızı Rozet başarıyla kaldırıldı! Odaklanmaya devam et."
                 )
             } else {
                 LocalDataStore.shared.addLog(
-                    title: "Telafi Başarısı",
-                    detail: "Kırmızı rozeti kaldırmak için 1 başarılı gün daha gerekiyor.",
+                    title: "Telafi Günü Başarılı",
+                    detail: "Kırmızı rozetin kalkması için 1 başarılı gün daha gerekiyor.",
                     type: .info
                 )
             }
@@ -87,14 +68,18 @@ public final class DisciplineEngine {
             
             if state.level > oldLevel {
                 LocalDataStore.shared.addLog(
-                    title: "Seviye Atlandı!",
-                    detail: "Tebrikler! Seviyeniz \(oldLevel)'den \(state.level)'e yükseldi.",
+                    title: "Yeni Seviye!",
+                    detail: "Seviyeniz \(oldLevel)'den \(state.level)'e yükseldi.",
                     type: .success
+                )
+                NotificationManager.shared.sendLocalNotification(
+                    title: "Seviye Atladınız!",
+                    body: "Tebrikler, yeni rütbeniz: \(getLevelName(for: state.level))"
                 )
             } else {
                 LocalDataStore.shared.addLog(
-                    title: "Başarı Kaydedildi",
-                    detail: "Bugünkü limitlerinize uydunuz. Mevcut seriniz: \(state.consecutiveSuccessDays) gün.",
+                    title: "Gün Başarılı",
+                    detail: "Bugünkü sınırlarınıza başarıyla uydunuz. Seri: \(state.consecutiveSuccessDays) gün.",
                     type: .success
                 )
             }
@@ -103,7 +88,7 @@ public final class DisciplineEngine {
         saveState(state)
     }
     
-    /// İhlal durumunu işler (kural aşımı veya kuralın bypass edilmesi).
+    /// Bypass veya sınır kuralı ihlali yapıldığında tetiklenir.
     public func recordViolation(for date: Date = Date()) {
         var state = loadState()
         let dateKey = formatDate(date)
@@ -114,7 +99,7 @@ public final class DisciplineEngine {
         state.dailyHistory[dateKey] = "violation"
         state.lastViolationDate = date
         
-        // İhlal cezası
+        // İhlal Cezası
         state.consecutiveSuccessDays = 0
         state.level = 1
         state.hasRedBadge = true
@@ -122,15 +107,21 @@ public final class DisciplineEngine {
         state.activeRedemptionDaysLeft = 2
         
         LocalDataStore.shared.addLog(
-            title: "Disiplin İhlali!",
-            detail: "Sınırlarınız aşıldı veya kurallar ihlal edildi. Seviyeniz 1'e düşürüldü ve Kırmızı Rozet aldınız.",
+            title: "Disiplin İhlal Edildi!",
+            detail: "Kural bypass edildi veya ihlal oluştu. Seviyeniz 1'e düşürüldü, Kırmızı Rozet verildi.",
             type: .error
+        )
+        
+        NotificationManager.shared.sendLocalNotification(
+            title: "Disiplin İhlali!",
+            body: "Sınırlarınız ihlal edildi. Seviyeniz sıfırlandı ve Kırmızı Rozet aldınız."
         )
         
         saveState(state)
     }
     
-    /// Seviye ismini döner.
+    // MARK: - Levels
+    
     public func getLevelName(for level: Int) -> String {
         switch level {
         case 1: return "Başlangıç (Level 1)"
@@ -139,11 +130,9 @@ public final class DisciplineEngine {
         case 4: return "Odak Ustası (Level 4)"
         case 5: return "Zaman Hakimi (Level 5)"
         case 6: return "Disiplin Anıtı (Level 6)"
-        default: return "Bilinmeyen Seviye"
+        default: return "Bilinmeyen Rütbe"
         }
     }
-    
-    // MARK: - Helpers
     
     private func calculateLevel(consecutiveSuccessDays: Int) -> Int {
         if consecutiveSuccessDays >= 60 { return 6 }

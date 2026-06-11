@@ -7,10 +7,9 @@
 
 import SwiftUI
 import FamilyControls
-import UserNotifications
 
 struct OnboardingView: View {
-    @EnvironmentObject var protectionEngine: ProtectionEngine
+    @EnvironmentObject var authManager: ScreenTimeAuthorizationManager
     @State private var isRequesting = false
     @State private var errorMessage: String? = nil
     
@@ -21,7 +20,6 @@ struct OnboardingView: View {
             VStack(spacing: 30) {
                 Spacer()
                 
-                // Logo / Simge
                 ZStack {
                     Circle()
                         .fill(UITheme.copperAccent.opacity(0.15))
@@ -35,7 +33,6 @@ struct OnboardingView: View {
                 }
                 .padding(.bottom, 10)
                 
-                // Başlıklar
                 VStack(spacing: 12) {
                     Text("Boundary Shield")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
@@ -49,7 +46,6 @@ struct OnboardingView: View {
                 
                 Spacer()
                 
-                // Bilgilendirme Maddeleri
                 VStack(alignment: .leading, spacing: 20) {
                     onboardingFeature(
                         icon: "hourglass.badge.plus",
@@ -87,7 +83,6 @@ struct OnboardingView: View {
                         .padding(.horizontal)
                 }
                 
-                // İzin Verme Butonu
                 Button(action: {
                     requestPermissionFlow()
                 }) {
@@ -140,11 +135,8 @@ struct OnboardingView: View {
         
         Task {
             do {
-                // 1. Ekran Süresi İzni
-                try await protectionEngine.requestAuthorization()
-                
-                // 2. Bildirim İzni (İsteğe bağlı, hataya sebep olmamalı)
-                let _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+                try await authManager.requestAuthorization()
+                NotificationManager.shared.requestAuthorization()
                 
                 DispatchQueue.main.async {
                     self.isRequesting = false
@@ -157,9 +149,4 @@ struct OnboardingView: View {
             }
         }
     }
-}
-
-#Preview {
-    OnboardingView()
-        .environmentObject(ProtectionEngine.shared)
 }

@@ -1,0 +1,77 @@
+name: BoundaryShield
+options:
+  bundleIdPrefix: com.asujai
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  BoundaryShield:
+    type: application
+    platform: iOS
+    sources:
+      - path: BoundaryShield/Sources/Core
+      - path: BoundaryShield/Sources/UI
+      - path: BoundaryShield/Sources/Resources
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.asujai.boundaryshield
+      DEVELOPMENT_TEAM: "" # Xcode üzerinde kullanıcı kendi takımını seçebilir
+    entitlements:
+      path: BoundaryShield/Sources/Resources/BoundaryShield.entitlements
+    dependencies:
+      - target: BoundaryShieldDeviceActivityMonitor
+      - target: BoundaryShieldShieldConfiguration
+      - target: BoundaryShieldShieldAction
+
+  BoundaryShieldDeviceActivityMonitor:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: BoundaryShield/Sources/Extensions/DeviceActivityMonitorExtension.swift
+      - path: BoundaryShield/Sources/Core/AppConfiguration.swift
+      - path: BoundaryShield/Sources/Core/AppGroupStore.swift
+      - path: BoundaryShield/Sources/Core/LocalDataStore.swift
+      - path: BoundaryShield/Sources/Core/DataModels.swift
+      - path: BoundaryShield/Sources/Core/QuoteManager.swift
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.asujai.boundaryshield.deviceactivitymonitor
+      INFOPLIST_FILE: BoundaryShield/Sources/Resources/DeviceActivityMonitor-Info.plist
+    entitlements:
+      path: BoundaryShield/Sources/Resources/BoundaryShieldDeviceActivityMonitor.entitlements
+
+  BoundaryShieldShieldConfiguration:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: BoundaryShield/Sources/Extensions/ShieldConfigurationExtension.swift
+      - path: BoundaryShield/Sources/Core/AppConfiguration.swift
+      - path: BoundaryShield/Sources/Core/AppGroupStore.swift
+      - path: BoundaryShield/Sources/Core/LocalDataStore.swift
+      - path: BoundaryShield/Sources/Core/DataModels.swift
+      - path: BoundaryShield/Sources/Core/QuoteManager.swift
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.asujai.boundaryshield.shieldconfiguration
+      INFOPLIST_FILE: BoundaryShield/Sources/Resources/ShieldConfiguration-Info.plist
+    entitlements:
+      path: BoundaryShield/Sources/Resources/BoundaryShieldShieldConfiguration.entitlements
+
+  BoundaryShieldShieldAction:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: BoundaryShield/Sources/Extensions/ShieldActionExtension.swift
+      - path: BoundaryShield/Sources/Core/AppConfiguration.swift
+      - path: BoundaryShield/Sources/Core/AppGroupStore.swift
+      - path: BoundaryShield/Sources/Core/LocalDataStore.swift
+      - path: BoundaryShield/Sources/Core/DataModels.swift
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.asujai.boundaryshield.shieldaction
+      INFOPLIST_FILE: BoundaryShield/Sources/Resources/ShieldAction-Info.plist
+    entitlements:
+      path: BoundaryShield/Sources/Resources/BoundaryShieldShieldAction.entitlements
+
+  BoundaryShieldTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: BoundaryShield/Tests
+    dependencies:
+      - target: BoundaryShield

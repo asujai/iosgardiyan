@@ -8,9 +8,9 @@
 import SwiftUI
 
 struct ProtectionView: View {
-    @State private var rules: [ShieldRule] = []
+    @State private var rules: [AppLimitRule] = []
     @State private var filterSelection: String = "active" // active, shieldActive, all
-    @State private var selectedRule: ShieldRule? = nil
+    @State private var selectedRule: AppLimitRule? = nil
     
     var body: some View {
         NavigationStack {
@@ -18,7 +18,6 @@ struct ProtectionView: View {
                 UITheme.backgroundDark.ignoresSafeArea()
                 
                 VStack(spacing: 16) {
-                    // Filtre Seçenekleri
                     filterBar
                     
                     if filteredRules.isEmpty {
@@ -111,7 +110,7 @@ struct ProtectionView: View {
         }
     }
     
-    private func ruleCard(for rule: ShieldRule) -> some View {
+    private func ruleCard(for rule: AppLimitRule) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(rule.name)
@@ -120,8 +119,7 @@ struct ProtectionView: View {
                 
                 Spacer()
                 
-                // Durum Etiketleri
-                if rule.isShieldActiveToday {
+                if rule.isFailed {
                     HStack(spacing: 4) {
                         Circle().fill(UITheme.errorRed).frame(width: 8, height: 8)
                         Text("Limit Doldu")
@@ -159,7 +157,7 @@ struct ProtectionView: View {
                     Text("Günlük Limit")
                         .font(.caption)
                         .foregroundColor(UITheme.textSecondary)
-                    Text(formatSeconds(rule.dailyLimitInSeconds))
+                    Text(formatSeconds(rule.dailyLimit))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(UITheme.textPrimary)
                 }
@@ -170,14 +168,13 @@ struct ProtectionView: View {
                     Text("Aktif Günler")
                         .font(.caption)
                         .foregroundColor(UITheme.textSecondary)
-                    Text(formatActiveDays(rule.activeDays))
+                    Text(formatActiveDays(rule.activeWeekdays))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(UITheme.textPrimary)
                 }
             }
             
-            // Eğer planlanmış değişiklik varsa
-            if rule.pendingNewLimitInSeconds != nil || rule.pendingActiveDays != nil {
+            if rule.plannedNextDayLimit != nil || rule.plannedNextDayActiveDays != nil {
                 HStack(spacing: 6) {
                     Image(systemName: "clock.arrow.2.circlepath")
                         .font(.caption)
@@ -193,7 +190,7 @@ struct ProtectionView: View {
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(rule.isShieldActiveToday ? UITheme.errorRed.opacity(0.3) : Color.white.opacity(0.05), lineWidth: 1)
+                .stroke(rule.isFailed ? UITheme.errorRed.opacity(0.3) : Color.white.opacity(0.05), lineWidth: 1)
         )
     }
     
@@ -203,12 +200,12 @@ struct ProtectionView: View {
         rules = LocalDataStore.shared.loadRules()
     }
     
-    private var filteredRules: [ShieldRule] {
+    private var filteredRules: [AppLimitRule] {
         switch filterSelection {
         case "active":
             return rules.filter { $0.isActive }
         case "shieldActive":
-            return rules.filter { $0.isShieldActiveToday }
+            return rules.filter { $0.isFailed }
         default:
             return rules
         }
