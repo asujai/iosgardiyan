@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>compileBitcode</key>
+    <false/>
+    <key>destination</key>
+    <string>export</string>
+    <key>method</key>
+    <string>development</string>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>teamID</key>
+    <string>APPLE_TEAM_ID_PLACEHOLDER</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.asujai.boundaryshield</key>
+        <string>BoundaryShield_Development_Profile</string>
+        <key>com.asujai.boundaryshield.deviceactivitymonitor</key>
+        <string>BoundaryShield_Monitor_Profile</string>
+        <key>com.asujai.boundaryshield.shieldconfiguration</key>
+        <string>BoundaryShield_ShieldConfig_Profile</string>
+        <key>com.asujai.boundaryshield.shieldaction</key>
+        <string>BoundaryShield_ShieldAction_Profile</string>
+    </dict>
+</dict>
+</plist>

@@ -1,0 +1,136 @@
+name: Boundary Shield iOS Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build, Test & Export IPA
+    runs-on: macos-14
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Xcode Sürümü
+      run: |
+        sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+        xcodebuild -version
+
+    - name: XcodeGen Kurulumu
+      run: |
+        brew install xcodegen
+
+    - name: XcodeGen & project.yml Hazırlığı (Signing varsa Team ID Ekle)
+      run: |
+        if [ -n "${{ secrets.APPLE_TEAM_ID }}" ]; then
+          echo "Setting Development Team ID in project.yml..."
+          sed -i '' "s/DEVELOPMENT_TEAM: \"\"/DEVELOPMENT_TEAM: \"${{ secrets.APPLE_TEAM_ID }}\"/g" project.yml
+        fi
+
+    - name: Xcode Projesini Üret (XcodeGen)
+      run: |
+        xcodegen generate
+
+    - name: Birim (Unit) Testleri Çalıştır
+      run: |
+        xcodebuild test \
+          -project BoundaryShield.xcodeproj \
+          -scheme BoundaryShieldTests \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' \
+          -quiet
+
+    - name: Apple Sertifikasını ve Profilini Keychain'e Ekle (Signing)
+      id: signing_step
+      env:
+        P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+        P12_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        if [ -z "$P12_BASE64" ]; then
+          echo "WARNING: Signing secrets not configured. Skipping code signing steps."
+          echo "has_signing=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # Sertifika ve profil dosyalarını oluştur
+        CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+        PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+        KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+        
+        echo -n "$P12_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+        echo -n "$PROFILE_BASE64" | base64 --decode -o $PP_PATH
+        
+        # Keychain oluştur ve yapılandır
+        security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+        security default-keychain -s $KEYCHAIN_PATH
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+        security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+        
+        # Sertifikayı import et
+        security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+        security list-keychain -d user -s $KEYCHAIN_PATH
+        
+        # Provisioning profile'ı taşı
+        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+        cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+        
+        echo "has_signing=true" >> $GITHUB_OUTPUT
+
+    - name: Uygulamayı Derle ve Arşivle (Archive)
+      run: |
+        if [ "${{ steps.signing_step.outputs.has_signing }}" = "true" ]; then
+          # İmzalı Archive
+          xcodebuild archive \
+            -project BoundaryShield.xcodeproj \
+            -scheme BoundaryShield \
+            -archivePath $RUNNER_TEMP/BoundaryShield.xcarchive \
+            -configuration Release
+        else
+          # İmzası Olmayan Sadece Derleme Doğrulaması (No Signing)
+          xcodebuild archive \
+            -project BoundaryShield.xcodeproj \
+            -scheme BoundaryShield \
+            -archivePath $RUNNER_TEMP/BoundaryShield.xcarchive \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+        fi
+
+    - name: IPA İhraç Et (Export IPA)
+      run: |
+        if [ "${{ steps.signing_step.outputs.has_signing }}" = "true" ]; then
+          # ExportOptions.plist içindeki Team ID placeholder'ını gerçek değerle değiştir
+          sed -i '' "s/APPLE_TEAM_ID_PLACEHOLDER/${{ secrets.APPLE_TEAM_ID }}/g" ExportOptions.plist
+          
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/BoundaryShield.xcarchive \
+            -exportPath $RUNNER_TEMP/build_output \
+            -exportOptionsPlist ExportOptions.plist
+        else
+          # İmzalı olmadığı durumda test amaçlı zip dosyası veya simulator paketi oluşturulabilir.
+          # Sideloading için imzasız IPA üretilip Windows'ta imzalama araçları da kullanılabilir.
+          mkdir -p $RUNNER_TEMP/build_output
+          cp -r $RUNNER_TEMP/BoundaryShield.xcarchive/Products/Applications/BoundaryShield.app $RUNNER_TEMP/build_output/BoundaryShield.app
+          
+          # İmzasız .app dosyasını Payload klasörüne alıp zip'leyerek IPA taklidi yapıyoruz.
+          cd $RUNNER_TEMP/build_output
+          mkdir Payload
+          cp -r BoundaryShield.app Payload/
+          zip -r BoundaryShield.ipa Payload
+        fi
+
+    - name: IPA Dosyasını Artifact Olarak Kaydet (Upload Artifact)
+      uses: actions/upload-artifact@v4
+      with:
+        name: BoundaryShield-IPA
+        path: |
+          /Users/runner/work/_temp/build_output/*.ipa
+          /Users/runner/work/_temp/build_output/BoundaryShield.ipa
+        if-no-files-found: error
+
